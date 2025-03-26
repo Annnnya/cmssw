@@ -5,16 +5,31 @@
 #include "FWCore/Framework/interface/Event.h"
 #include "FWCore/Framework/interface/WrapperBaseOrphanHandle.h"
 #include "FWCore/Framework/interface/global/EDProducer.h"
+#include "FWCore/Concurrency/interface/Async.h"
 #include "FWCore/MessageLogger/interface/MessageLogger.h"
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
 #include "FWCore/ParameterSet/interface/ParameterSetDescription.h"
 #include "FWCore/Utilities/interface/Exception.h"
 #include "HeterogeneousCore/MPICore/interface/MPIToken.h"
 
+
+#include "FWCore/Concurrency/interface/Async.h"
+#include "FWCore/Concurrency/interface/chain_first.h"
+#include "FWCore/Framework/interface/stream/EDProducer.h"
+#include "FWCore/Framework/interface/MakerMacros.h"
+#include "FWCore/ParameterSet/interface/ConfigurationDescriptions.h"
+#include "FWCore/ParameterSet/interface/ParameterSet.h"
+#include "FWCore/ParameterSet/interface/ParameterSetDescription.h"
+#include "FWCore/ServiceRegistry/interface/Service.h"
+#include "FWCore/ServiceRegistry/interface/ServiceMaker.h"
+#include "FWCore/Utilities/interface/Exception.h"
+
+#include <condition_variable>
+#include <mutex>
 // local include files
 #include "api.h"
 
-class MPIReceiver : public edm::global::EDProducer<> {
+class MPIReceiver : public edm::stream::EDProducer<edm::ExternalWork> {
 public:
   MPIReceiver(edm::ParameterSet const& config)
       : upstream_(consumes<MPIToken>(config.getParameter<edm::InputTag>("upstream"))),
@@ -45,7 +60,32 @@ public:
     }
   }
 
-  void produce(edm::StreamID, edm::Event& event, edm::EventSetup const&) const override {
+  void acquire(edm::Event const& event, edm::EventSetup const&, edm::WaitingTaskWithArenaHolder holder) final {
+    MPIToken token = event.get(upstream_);
+  
+    // Create a shared vector to hold received products, safely across threads
+    auto received = std::make_shared<std::vector<std::unique_ptr<edm::WrapperBase>>>();
+    received->reserve(products_.size());
+  
+    edm::Service<edm::Async> as;
+    as->runAsync(
+        std::move(holder),
+        [this, token, received]() {
+          for (auto const& entry : products_) {
+            std::unique_ptr<edm::WrapperBase> wrapper(
+                reinterpret_cast<edm::WrapperBase*>(entry.wrappedType.getClass()->New()));
+            token.channel()->receiveProduct(instance_, entry.wrappedType, *wrapper);
+            received->push_back(std::move(wrapper));
+          }
+          // store into member on main thread, after async completes
+          this->received_products_ = std::move(*received);
+        },
+        []() { return "Calling MPIReceiver::acquire()"; }
+    );
+  }
+  
+
+  void produce(edm::Event& event, edm::EventSetup const&) final {
     // read the MPIToken used to establish the communication channel
     MPIToken token = event.get(upstream_);
 
@@ -54,16 +94,17 @@ public:
     // token.channel()->receiveProduct(instance_, numProducts);
     // edm::LogVerbatim("MPIReceiver") << "Received number of products: " << numProducts;
 
-    for (auto const& entry : products_) {
-      std::unique_ptr<edm::WrapperBase> wrapper(
-          reinterpret_cast<edm::WrapperBase*>(entry.wrappedType.getClass()->New()));
+    for (size_t i=0; i<products_.size(); ++i) {
+      auto const& entry = products_[i];
+      // std::unique_ptr<edm::WrapperBase> wrapper(
+      //     reinterpret_cast<edm::WrapperBase*>(entry.wrappedType.getClass()->New()));
 
-      // receive the data sent over the MPI channel
-      // note: currently this uses a blocking probe/recv
-      token.channel()->receiveProduct(instance_, entry.wrappedType, *wrapper);
+      // // receive the data sent over the MPI channel
+      // // note: currently this uses a blocking probe/recv
+      // token.channel()->receiveProduct(instance_, entry.wrappedType, *wrapper);
 
       // put the data into the Event
-      event.put(entry.token, std::move(wrapper));
+      event.put(entry.token, std::move(received_products_[i]));
     }
 
     // write a shallow copy of the channel to the output, so other modules can consume it
@@ -83,6 +124,8 @@ private:
   edm::EDPutTokenT<MPIToken> const token_;  // copy of the MPIToken that may be used to implement an ordering relation
   std::vector<Entry> products_;             // data to be read over the channel and put into the Event
   int32_t const instance_;                  // instance used to identify the source-destination pair
+
+  std::vector<std::unique_ptr<edm::WrapperBase>> received_products_;
 };
 
 #include "FWCore/Framework/interface/MakerMacros.h"

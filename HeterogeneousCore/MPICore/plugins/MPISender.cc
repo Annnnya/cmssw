@@ -6,6 +6,7 @@
 #include "DataFormats/Provenance/interface/ProductDescription.h"
 #include "DataFormats/Provenance/interface/ProductNamePattern.h"
 #include "FWCore/Framework/interface/Event.h"
+#include "FWCore/Concurrency/interface/Async.h"
 #include "FWCore/Framework/interface/GenericHandle.h"
 #include "FWCore/Framework/interface/WrapperBaseHandle.h"
 #include "FWCore/Framework/interface/global/EDProducer.h"
@@ -16,10 +17,24 @@
 #include "FWCore/Utilities/interface/Exception.h"
 #include "HeterogeneousCore/MPICore/interface/MPIToken.h"
 
+#include "FWCore/Concurrency/interface/Async.h"
+#include "FWCore/Concurrency/interface/chain_first.h"
+#include "FWCore/Framework/interface/stream/EDProducer.h"
+#include "FWCore/Framework/interface/MakerMacros.h"
+#include "FWCore/ParameterSet/interface/ConfigurationDescriptions.h"
+#include "FWCore/ParameterSet/interface/ParameterSet.h"
+#include "FWCore/ParameterSet/interface/ParameterSetDescription.h"
+#include "FWCore/ServiceRegistry/interface/Service.h"
+#include "FWCore/ServiceRegistry/interface/ServiceMaker.h"
+#include "FWCore/Utilities/interface/Exception.h"
+
+#include <condition_variable>
+#include <mutex>
+
 // local include files
 #include "api.h"
 
-class MPISender : public edm::global::EDProducer<> {
+class MPISender : public edm::stream::EDProducer<edm::ExternalWork> {
 public:
   MPISender(edm::ParameterSet const& config)
       : upstream_(consumes<MPIToken>(config.getParameter<edm::InputTag>("upstream"))),
@@ -79,23 +94,34 @@ public:
     // TODO add an error if a pattern does not match any branches? how?
   }
 
-  void produce(edm::StreamID, edm::Event& event, edm::EventSetup const&) const override {
-    // read the MPIToken used to establish the communication channel
+  void acquire(edm::Event const& event, edm::EventSetup const&, edm::WaitingTaskWithArenaHolder holder) final {
     MPIToken token = event.get(upstream_);
-
-    // int numProducts = static_cast<int>(products_.size());
-    // token.channel()->sendProduct(instance_, numProducts);
-
+  
+    // Pre-fetch all handles before the async part
+    std::vector<std::pair<edm::TypeWithDict, edm::WrapperBase const*>> productData;
     for (auto const& entry : products_) {
-      // read the products to be sent over the MPI channel
       edm::Handle<edm::WrapperBase> handle(entry.type.typeInfo());
       event.getByToken(entry.token, handle);
-      edm::WrapperBase const* wrapper = handle.product();
-      // send the products over MPI
-      // note: currently this uses a blocking send
-      token.channel()->sendProduct(instance_, entry.wrappedType, *wrapper);
+      productData.emplace_back(entry.wrappedType, handle.product());
     }
+  
+    edm::Service<edm::Async> as;
+    as->runAsync(
+        std::move(holder),
+        [this, token, productData = std::move(productData)]() {
+          for (size_t i = 0; i < products_.size(); ++i) {
+            auto const& entry = products_[i];
+            auto const& [wrappedType, wrapper] = productData[i];
+            token.channel()->sendProduct(instance_, wrappedType, *wrapper);
+          }
+        },
+        []() { return "Calling MPISender::acquire()"; }
+    );
+  }
+  
 
+  void produce(edm::Event& event, edm::EventSetup const&) final {
+    MPIToken token = event.get(upstream_);
     // write a shallow copy of the channel to the output, so other modules can consume it
     // to indicate that they should run after this
     event.emplace(token_, token);
