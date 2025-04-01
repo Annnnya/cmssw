@@ -98,22 +98,25 @@ public:
     MPIToken token = event.get(upstream_);
   
     // Pre-fetch all handles before the async part
-    std::vector<std::pair<edm::TypeWithDict, edm::WrapperBase const*>> productData;
+    MPIAsyncKeeper async_keeper;
+
     for (auto const& entry : products_) {
+      // read the products to be sent over the MPI channel
       edm::Handle<edm::WrapperBase> handle(entry.type.typeInfo());
       event.getByToken(entry.token, handle);
-      productData.emplace_back(entry.wrappedType, handle.product());
+      edm::WrapperBase const* wrapper = handle.product();
+      // send the products over MPI
+      // note: currently this uses a blocking send
+      token.channel()->sendProduct(instance_, entry.wrappedType, *wrapper, async_keeper);
     }
   
     edm::Service<edm::Async> as;
     as->runAsync(
         std::move(holder),
-        [this, token, productData = std::move(productData)]() {
-          for (size_t i = 0; i < products_.size(); ++i) {
-            auto const& entry = products_[i];
-            auto const& [wrappedType, wrapper] = productData[i];
-            token.channel()->sendProduct(instance_, wrappedType, *wrapper);
-          }
+        [this, async_keeper = std::move(async_keeper)]() mutable {
+          for (MPI_Request& req : async_keeper.MPI_requests) {
+            MPI_Wait(&req, MPI_STATUS_IGNORE);
+          }          
         },
         []() { return "Calling MPISender::acquire()"; }
     );

@@ -18,6 +18,8 @@
 #include "conversion.h"
 #include "messages.h"
 
+#include <iostream>
+
 namespace {
   // copy the content of an std::string-like object to an N-sized char buffer:
   // if the string is larger than the buffer, copy only the first N bytes;
@@ -157,6 +159,17 @@ MPI_Status MPIChannel::receiveEventAuxiliary_(edm::EventAuxiliary& aux, MPI_Mess
 }
 
 // serialize an object of generic type using its ROOT dictionary, and send the binary blob
+void MPIChannel::sendSerializedProduct_(int instance, TClass const* type, void const* product, MPIAsyncKeeper& async_keeper) {
+  std::shared_ptr<TBufferFile> buffer = std::make_shared<TBufferFile>(TBuffer::kWrite);
+  type->Streamer(const_cast<void*>(product), *buffer);
+  int tag = EDM_MPI_SendSerializedProduct | instance * EDM_MPI_MessageTagWidth_;
+  // std::cerr << "message size " <<  buffer->Length() << std::endl;
+  MPI_Request req;
+  MPI_Issend(buffer->Buffer(), buffer->Length(), MPI_BYTE, dest_, tag, comm_, &req);
+  async_keeper.MPI_requests.push_back(req);
+  async_keeper.buffers_to_keep_alive.push_back(buffer);
+}
+
 void MPIChannel::sendSerializedProduct_(int instance, TClass const* type, void const* product) {
   TBufferFile buffer{TBuffer::kWrite};
   type->Streamer(const_cast<void*>(product), buffer);
@@ -195,6 +208,28 @@ void MPIChannel::receiveTrivialProduct_(int instance, edm::ObjectWithDict& produ
 }
 
 // transfer a wrapped object using its TrivialCopyTraits
+void MPIChannel::sendTrivialCopyProduct_(int instance, edm::WrapperBase const* wrapper, MPIAsyncKeeper& async_keeper) {
+  int tag = EDM_MPI_SendTrivialCopyProduct | instance * EDM_MPI_MessageTagWidth_;
+
+  // if the wrapped type requires it, send the properties required toinitialise the remote copy
+  if (wrapper->hasTrivialCopyProperties()) {
+    edm::AnyBuffer buffer = wrapper->trivialCopyParameters();
+    MPI_Request req;
+    MPI_Issend(buffer.data(), buffer.size_bytes(), MPI_BYTE, dest_, tag, comm_, &req);
+    async_keeper.MPI_requests.push_back(req);
+  }
+
+  // transfer the memory regions
+  auto regions = wrapper->trivialCopyRegions();
+  // TODO send the number of regions ?
+  for (size_t i = 0; i < regions.size(); ++i) {
+    assert(regions[i].data() != nullptr);
+    MPI_Request req;
+    MPI_Issend(regions[i].data(), regions[i].size_bytes(), MPI_BYTE, dest_, tag, comm_, &req);
+    async_keeper.MPI_requests.push_back(req);
+  }
+}
+
 void MPIChannel::sendTrivialCopyProduct_(int instance, edm::WrapperBase const* wrapper) {
   int tag = EDM_MPI_SendTrivialCopyProduct | instance * EDM_MPI_MessageTagWidth_;
 
