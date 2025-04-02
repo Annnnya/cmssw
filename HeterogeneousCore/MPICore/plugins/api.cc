@@ -164,9 +164,8 @@ void MPIChannel::sendSerializedProduct_(int instance, TClass const* type, void c
   type->Streamer(const_cast<void*>(product), *buffer);
   int tag = EDM_MPI_SendSerializedProduct | instance * EDM_MPI_MessageTagWidth_;
   // std::cerr << "message size " <<  buffer->Length() << std::endl;
-  MPI_Request req;
-  MPI_Issend(buffer->Buffer(), buffer->Length(), MPI_BYTE, dest_, tag, comm_, &req);
-  async_keeper.MPI_requests.push_back(req);
+  async_keeper.requests.emplace_back();
+  MPI_Issend(buffer->Buffer(), buffer->Length(), MPI_BYTE, dest_, tag, comm_, &async_keeper.requests.back());
   async_keeper.buffers_to_keep_alive.push_back(buffer);
 }
 
@@ -214,9 +213,8 @@ void MPIChannel::sendTrivialCopyProduct_(int instance, edm::WrapperBase const* w
   // if the wrapped type requires it, send the properties required toinitialise the remote copy
   if (wrapper->hasTrivialCopyProperties()) {
     edm::AnyBuffer buffer = wrapper->trivialCopyParameters();
-    MPI_Request req;
-    MPI_Issend(buffer.data(), buffer.size_bytes(), MPI_BYTE, dest_, tag, comm_, &req);
-    async_keeper.MPI_requests.push_back(req);
+    async_keeper.requests.emplace_back();
+    MPI_Issend(buffer.data(), buffer.size_bytes(), MPI_BYTE, dest_, tag, comm_, &async_keeper.requests.back());
   }
 
   // transfer the memory regions
@@ -224,9 +222,8 @@ void MPIChannel::sendTrivialCopyProduct_(int instance, edm::WrapperBase const* w
   // TODO send the number of regions ?
   for (size_t i = 0; i < regions.size(); ++i) {
     assert(regions[i].data() != nullptr);
-    MPI_Request req;
-    MPI_Issend(regions[i].data(), regions[i].size_bytes(), MPI_BYTE, dest_, tag, comm_, &req);
-    async_keeper.MPI_requests.push_back(req);
+    async_keeper.requests.emplace_back();
+    MPI_Issend(regions[i].data(), regions[i].size_bytes(), MPI_BYTE, dest_, tag, comm_, &async_keeper.requests.back());
   }
 }
 

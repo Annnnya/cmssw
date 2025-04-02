@@ -21,7 +21,7 @@
 
 struct MPIAsyncKeeper {
   std::vector<std::shared_ptr<TBufferFile>> buffers_to_keep_alive;
-  std::vector<MPI_Request> MPI_requests;
+  std::list<MPI_Request> requests;
 };
 
 class MPIChannel {

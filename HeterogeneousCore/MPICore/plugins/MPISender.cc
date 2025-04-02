@@ -30,6 +30,9 @@
 
 #include <condition_variable>
 #include <mutex>
+#include <fcntl.h>
+#include <unistd.h>
+#include <chrono>
 
 // local include files
 #include "api.h"
@@ -114,9 +117,19 @@ public:
     as->runAsync(
         std::move(holder),
         [this, async_keeper = std::move(async_keeper)]() mutable {
-          for (MPI_Request& req : async_keeper.MPI_requests) {
+          // auto start = std::chrono::steady_clock::now();
+          for (MPI_Request& req : async_keeper.requests) {
             MPI_Wait(&req, MPI_STATUS_IGNORE);
-          }          
+          }
+          // auto end = std::chrono::steady_clock::now();
+          // auto duration_us = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+          // std::string s = std::to_string(duration_us);
+          // int fd = open(this->time_filename_.c_str(), O_WRONLY | O_CREAT | O_APPEND, 0644);
+          // if (fd != -1) {
+          //   write(fd, s.c_str(), s.size());
+          //   close(fd);
+          // }
+          // std::cerr << s << std::endl;
         },
         []() { return "Calling MPISender::acquire()"; }
     );
@@ -143,6 +156,7 @@ private:
   std::vector<edm::ProductNamePattern> patterns_;  // branches to read from the Event and send over the MPI channel
   std::vector<Entry> products_;                    // types and tokens corresponding to the branches
   int32_t const instance_;                         // instance used to identify the source-destination pair
+  std::string time_filename_;
 };
 
 #include "FWCore/Framework/interface/MakerMacros.h"
