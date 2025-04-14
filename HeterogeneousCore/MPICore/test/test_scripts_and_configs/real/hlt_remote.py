@@ -1,5 +1,7 @@
 import FWCore.ParameterSet.Config as cms
 
+import os
+
 from hlt import process as _process
 
 process = cms.Process("REMOTE")
@@ -16,16 +18,28 @@ for module in _process.es_producers.keys():
     setattr(process, module, getattr(_process, module).clone())
 
 
-process.options.numberOfThreads = 1
-process.options.numberOfStreams = 1
+process.options.numberOfThreads = int(os.environ.get("EXPERIMENT_THREADS", 32))
+process.options.numberOfStreams = int(os.environ.get("EXPERIMENT_STREAMS", 24))
 process.options.numberOfConcurrentLuminosityBlocks = 1
+
+
+# FastTimer output
+experiment_name = os.environ.get("EXPERIMENT_NAME", "unnamed")
+output_dir = os.environ.get("EXPERIMENT_OUTPUT_DIR", "../../test_results/one_time_tests/")
+
+
+process.FastTimerService = _process.FastTimerService.clone()
+process.FastTimerService.writeJSONSummary = True
+process.FastTimerService.jsonFileName=cms.untracked.string(f"{output_dir}/remote_{experiment_name}.json")
+
+process.ThroughputService = _process.ThroughputService.clone()
+# process.ThroughputService.printEventSummary = True
 
 # set up the MPI communication channel
 process.load("HeterogeneousCore.MPIServices.MPIService_cfi")
 process.MPIService.pmix_server_uri = "file:server.uri"
 
 process.source = cms.Source("MPISource",
-  # FIXME this should not be necessary
   firstRun = cms.untracked.uint32(383631)
 )
 process.source.run_local = cms.untracked.bool(True)

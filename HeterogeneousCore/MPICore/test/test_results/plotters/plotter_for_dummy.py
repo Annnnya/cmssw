@@ -4,7 +4,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import os
 
-experiment_name = "general_dummy_1-1"
+experiment_name = "synchronous_thread_dependance"
 mode = "local"
 
 df = pd.read_csv(f"../{experiment_name}/{mode}_summary_table.csv")

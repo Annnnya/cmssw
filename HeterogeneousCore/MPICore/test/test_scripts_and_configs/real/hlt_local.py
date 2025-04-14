@@ -1,4 +1,5 @@
 import FWCore.ParameterSet.Config as cms
+import os
 
 # run over HLTPhysics data from run 383363
 from hlt import process
@@ -6,8 +7,9 @@ from hlt import process
 process.load("FWCore.MessageLogger.MessageLogger_cfi")
 
 # run with 32 threads, 24 concurrent events, 1 concurrent lumisection, over 10k events
-process.options.numberOfThreads = 1
-process.options.numberOfStreams = 1
+process.options.numberOfThreads = int(os.environ.get("EXPERIMENT_THREADS", 32))
+process.options.numberOfStreams = int(os.environ.get("EXPERIMENT_STREAMS", 24))
+
 process.options.numberOfConcurrentLuminosityBlocks = 1  # MPIController does not support concurrent lumisections
 process.maxEvents.input = 1000 # 10300
 
@@ -15,7 +17,15 @@ process.maxEvents.input = 1000 # 10300
 process.options.wantSummary = False
 process.MessageLogger.cerr.enableStatistics = cms.untracked.bool(False)
 
+
+# FastTimer output
+experiment_name = os.environ.get("EXPERIMENT_NAME", "unnamed")
+output_dir = os.environ.get("EXPERIMENT_OUTPUT_DIR", "../../test_results/one_time_tests/")
+
 process.FastTimerService.writeJSONSummary = True
+process.FastTimerService.jsonFileName=cms.untracked.string(f"{output_dir}/local_{experiment_name}.json")
+
+# process.ThroughputService.printEventSummary = True
 
 # set up the MPI communication channel
 process.load("HeterogeneousCore.MPIServices.MPIService_cfi")

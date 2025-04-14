@@ -33,7 +33,7 @@ process.PrescaleService.forceDefault = True
 
 # do not print a final summary
 process.options.wantSummary = True
-process.MessageLogger.cerr.enableStatistics = cms.untracked.bool(False)
+# process.MessageLogger.cerr.enableStatistics = cms.untracked.bool(True)
 
 # write a JSON file with the timing information
 process.FastTimerService.writeJSONSummary = True

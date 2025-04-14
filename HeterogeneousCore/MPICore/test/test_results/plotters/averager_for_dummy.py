@@ -6,7 +6,7 @@ import pandas as pd
 from collections import defaultdict
 
 # Base directory from your bash script
-experiment_name = "general_dummy_1-1"
+experiment_name = "synchronous_thread_dependance"
 base_dir = f"../{experiment_name}"
 mode = "local"
 
