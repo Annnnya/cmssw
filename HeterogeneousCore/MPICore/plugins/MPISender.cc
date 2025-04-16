@@ -6,6 +6,7 @@
 #include "DataFormats/Provenance/interface/ProductDescription.h"
 #include "DataFormats/Provenance/interface/ProductNamePattern.h"
 #include "FWCore/Framework/interface/Event.h"
+#include "FWCore/Concurrency/interface/Async.h"
 #include "FWCore/Framework/interface/GenericHandle.h"
 #include "FWCore/Framework/interface/WrapperBaseHandle.h"
 #include "FWCore/Framework/interface/global/EDProducer.h"
@@ -16,10 +17,27 @@
 #include "FWCore/Utilities/interface/Exception.h"
 #include "HeterogeneousCore/MPICore/interface/MPIToken.h"
 
+#include "FWCore/Concurrency/interface/Async.h"
+#include "FWCore/Concurrency/interface/chain_first.h"
+#include "FWCore/Framework/interface/stream/EDProducer.h"
+#include "FWCore/Framework/interface/MakerMacros.h"
+#include "FWCore/ParameterSet/interface/ConfigurationDescriptions.h"
+#include "FWCore/ParameterSet/interface/ParameterSet.h"
+#include "FWCore/ParameterSet/interface/ParameterSetDescription.h"
+#include "FWCore/ServiceRegistry/interface/Service.h"
+#include "FWCore/ServiceRegistry/interface/ServiceMaker.h"
+#include "FWCore/Utilities/interface/Exception.h"
+
+#include <condition_variable>
+#include <mutex>
+#include <fcntl.h>
+#include <unistd.h>
+#include <chrono>
+
 // local include files
 #include "api.h"
 
-class MPISender : public edm::global::EDProducer<> {
+class MPISender : public edm::stream::EDProducer<edm::ExternalWork> {
 public:
   MPISender(edm::ParameterSet const& config)
       : upstream_(consumes<MPIToken>(config.getParameter<edm::InputTag>("upstream"))),
@@ -79,12 +97,11 @@ public:
     // TODO add an error if a pattern does not match any branches? how?
   }
 
-  void produce(edm::StreamID, edm::Event& event, edm::EventSetup const&) const override {
-    // read the MPIToken used to establish the communication channel
+  void acquire(edm::Event const& event, edm::EventSetup const&, edm::WaitingTaskWithArenaHolder holder) final {
     MPIToken token = event.get(upstream_);
-
-    int numProducts = static_cast<int>(products_.size());
-    token.channel()->sendProduct(instance_, numProducts);
+  
+    // Pre-fetch all handles before the async part
+    MPIAsyncKeeper async_keeper;
 
     for (auto const& entry : products_) {
       // read the products to be sent over the MPI channel
@@ -93,9 +110,34 @@ public:
       edm::WrapperBase const* wrapper = handle.product();
       // send the products over MPI
       // note: currently this uses a blocking send
-      token.channel()->sendProduct(instance_, entry.wrappedType, *wrapper);
+      token.channel()->sendProduct(instance_, entry.wrappedType, *wrapper, async_keeper);
     }
+  
+    edm::Service<edm::Async> as;
+    as->runAsync(
+        std::move(holder),
+        [this, async_keeper = std::move(async_keeper)]() mutable {
+          // auto start = std::chrono::steady_clock::now();
+          for (MPI_Request& req : async_keeper.requests) {
+            MPI_Wait(&req, MPI_STATUS_IGNORE);
+          }
+          // auto end = std::chrono::steady_clock::now();
+          // auto duration_us = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+          // std::string s = std::to_string(duration_us);
+          // int fd = open(this->time_filename_.c_str(), O_WRONLY | O_CREAT | O_APPEND, 0644);
+          // if (fd != -1) {
+          //   write(fd, s.c_str(), s.size());
+          //   close(fd);
+          // }
+          // std::cerr << s << std::endl;
+        },
+        []() { return "Calling MPISender::acquire()"; }
+    );
+  }
+  
 
+  void produce(edm::Event& event, edm::EventSetup const&) final {
+    MPIToken token = event.get(upstream_);
     // write a shallow copy of the channel to the output, so other modules can consume it
     // to indicate that they should run after this
     event.emplace(token_, token);
@@ -114,6 +156,7 @@ private:
   std::vector<edm::ProductNamePattern> patterns_;  // branches to read from the Event and send over the MPI channel
   std::vector<Entry> products_;                    // types and tokens corresponding to the branches
   int32_t const instance_;                         // instance used to identify the source-destination pair
+  std::string time_filename_;
 };
 
 #include "FWCore/Framework/interface/MakerMacros.h"

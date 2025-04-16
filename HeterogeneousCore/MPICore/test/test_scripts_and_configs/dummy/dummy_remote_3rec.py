@@ -54,6 +54,17 @@ process.FastTimerService = cms.Service( "FastTimerService",
     dqmPath = cms.untracked.string( "HLT/TimerService" ),
 )
 
+process.ThroughputService = cms.Service( "ThroughputService",
+    eventRange = cms.untracked.uint32( 10000 ),
+    eventResolution = cms.untracked.uint32( 1 ),
+    printEventSummary = cms.untracked.bool( False ),
+    enableDQM = cms.untracked.bool( True ),
+    dqmPathByProcesses = cms.untracked.bool( True ),
+    dqmPath = cms.untracked.string( "HLT/Throughput" ),
+    timeRange = cms.untracked.double( 60000.0 ),
+    timeResolution = cms.untracked.double( 5.828 )
+)
+
 process.FastTimerService.writeJSONSummary = True
 process.FastTimerService.jsonFileName=cms.untracked.string(f"{output_dir}/remote_{experiment_name}.json")
 
