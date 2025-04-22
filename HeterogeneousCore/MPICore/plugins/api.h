@@ -16,10 +16,16 @@
 // local headers
 #include "messages.h"
 
+struct OffsetSizePair{
+  MPI_Aint offset;
+  int size;
+};
+
 class MPIChannel {
 public:
   MPIChannel() = default;
-  MPIChannel(MPI_Comm comm, int destination) : comm_(comm), dest_(destination) {}
+  MPIChannel(MPI_Comm comm, int destination) : comm_(comm), dest_(destination) { allocateWindow(); }
+  ~MPIChannel(){ freeWindow(); }
 
   // build a new MPIChannel that uses a duplicate of the underlying communicator and the same destination
   MPIChannel duplicate() const;
@@ -90,6 +96,14 @@ public:
       sendSerializedProduct_(instance, product.typeOf().getClass(), product.address());
     } else {
       sendTrivialProduct_(instance, product);
+    }
+  }
+
+  void putProduct(int instance, edm::TypeWithDict const& type, edm::WrapperBase const& wrapper, std::vector<OffsetSizePair>& putRegions){
+    if (wrapper.hasTrivialCopyTraits()) {
+      putTrivialProduct_(instance, wrapper, putRegions);
+    } else {
+      serializeAndPutProduct_(instance, type.getClass(), &wrapper, putRegions);
     }
   }
 
@@ -205,14 +219,27 @@ private:
   // transfer a wrapped object using its TrivialCopyTraits
   void sendTrivialCopyProduct_(int instance, edm::WrapperBase const* wrapper);
 
+  
+  void MPIChannel::putTrivialProduct_(int instance, edm::WrapperBase const* wrapper, std::vector<OffsetSizePair>& putRegions);
+  void MPIChannel::serializeAndPutProduct_(int instance, TClass const* type, void const* product, std::vector<OffsetSizePair>& putRegions);
+
   // receive a wrapped object using its TrivialCopyTraits
   void receiveTrivialCopyProduct_(int instance, edm::WrapperBase* wrapper);
+
+  void allocateWindow(); // allocate memory and attach to window
+  void freeWindow();     // cleanup
+  void flush();
 
   // MPI intercommunicator
   MPI_Comm comm_ = MPI_COMM_NULL;
 
   // MPI destination
   int dest_ = MPI_UNDEFINED;
+
+  std::atomic<MPI_Aint> currentOffset_ = 0;
+  std::vector<char> windowBuffer_;
+  MPI_Win window_;
+  MPI_Aint windowSize_ = 5 * 1024 * 1024;
 };
 
 #endif  // HeterogeneousCore_MPICore_plugins_api_h

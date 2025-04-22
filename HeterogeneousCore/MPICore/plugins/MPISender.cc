@@ -83,8 +83,9 @@ public:
     // read the MPIToken used to establish the communication channel
     MPIToken token = event.get(upstream_);
 
-    int numProducts = static_cast<int>(products_.size());
-    token.channel()->sendProduct(instance_, numProducts);
+    // int numProducts = static_cast<int>(products_.size());
+    // token.channel()->sendProduct(instance_, numProducts);
+    std::vector<OffsetSizePair> putRegions;
 
     for (auto const& entry : products_) {
       // read the products to be sent over the MPI channel
@@ -93,8 +94,10 @@ public:
       edm::WrapperBase const* wrapper = handle.product();
       // send the products over MPI
       // note: currently this uses a blocking send
-      token.channel()->sendProduct(instance_, entry.wrappedType, *wrapper);
+      token.channel()->putProduct(instance_, entry.wrappedType, *wrapper, putRegions);
     }
+    token.chanel()->flush();
+    token.chanel()->MPI_Send(putRegions);
 
     // write a shallow copy of the channel to the output, so other modules can consume it
     // to indicate that they should run after this

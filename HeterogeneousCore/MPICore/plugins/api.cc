@@ -252,3 +252,85 @@ void MPIChannel::receiveTrivialCopyProduct_(int instance, edm::WrapperBase* wrap
   // finalize the clone after the trivialCopy, if the type requires it
   wrapper->trivialCopyFinalize();
 }
+
+void MPIChannel::putTrivialProduct_(
+  int instance,
+  edm::WrapperBase const* wrapper,
+  std::vector<OffsetSizePair>& putRegions
+  ) {
+  MPI_Win_lock(MPI_LOCK_EXCLUSIVE, dest_, 0, window_);
+
+  // If necessary, put the init parameters
+  if (wrapper->hasTrivialCopyProperties()) {
+    edm::AnyBuffer buffer = wrapper->trivialCopyParameters();
+    MPI_Put(buffer.data(), buffer.size_bytes(), MPI_BYTE,
+            dest_, currentOffset_, buffer.size_bytes(), MPI_BYTE, window_);
+
+    putRegions.push_back({currentOffset_, static_cast<int>(buffer.size_bytes())});
+    currentOffset_ += buffer.size_bytes();
+  }
+
+  // Put all regions
+  auto regions = wrapper->trivialCopyRegions();
+  for (const auto& region : regions) {
+    assert(region.data() != nullptr);
+    MPI_Put(region.data(), region.size_bytes(), MPI_BYTE,
+            dest_, currentOffset_, region.size_bytes(), MPI_BYTE, window_);
+
+    putRegions.push_back({currentOffset_, static_cast<int>(region.size_bytes())});
+    currentOffset_ += region.size_bytes();
+  }
+
+  MPI_Win_unlock(dest_, window_);
+}
+
+void MPIChannel::serializeAndPutProduct_(
+  int instance,
+  TClass const* type,
+  void const* product,
+  std::vector<OffsetSizePair>& putRegions
+  ) {
+  // Serialize the product into a ROOT buffer
+  TBufferFile buffer(TBuffer::kWrite);
+  type->Streamer(const_cast<void*>(product), buffer);
+  int dataSize = buffer.Length();
+
+  // Lock the window for exclusive RMA access
+  MPI_Win_lock(MPI_LOCK_EXCLUSIVE, dest_, 0, window_);
+
+  // Ensure we don’t overflow the window buffer
+  assert(currentOffset_ + dataSize <= windowSize_);
+
+  // Put the serialized data into the window at current offset
+  MPI_Put(buffer.Buffer(), dataSize, MPI_BYTE,
+          dest_, currentOffset_, dataSize, MPI_BYTE, window_);
+
+  // Save offset for metadata
+  putRegions.push_back({currentOffset_, static_cast<int>dataSize});
+
+  // Update current offset
+  currentOffset_ += dataSize;
+
+  // Unlock the window
+  MPI_Win_unlock(dest_, window_);
+}
+
+
+void MPIChannel::allocateWindow() {
+  windowBuffer_.resize(windowSize_);
+  MPI_Win_create(windowBuffer_.data(), windowSize_, 1, MPI_INFO_NULL, comm_, &window_);
+}
+
+void MPIChannel::freeWindow() {
+  if (window_ != MPI_WIN_NULL) {
+    MPI_Win_free(&window_);
+    window_ = MPI_WIN_NULL;
+  }
+}
+
+void MPIChannel::flush() {
+  if (dest_ != MPI_UNDEFINED && window_ != MPI_WIN_NULL) {
+    MPI_Win_flush(dest_, window_);
+  }
+}
+
