@@ -258,15 +258,18 @@ void MPIChannel::putTrivialProduct_(
   edm::WrapperBase const* wrapper,
   std::vector<OffsetSizePair>& putRegions
   ) {
-  MPI_Win_lock(MPI_LOCK_EXCLUSIVE, dest_, 0, window_);
+  
+  MPI_Aint offset;
 
   // If necessary, put the init parameters
   if (wrapper->hasTrivialCopyProperties()) {
     edm::AnyBuffer buffer = wrapper->trivialCopyParameters();
+    offset = currentOffset_.fetch_add(buffer.size_bytes());
+    if (offset > windowSize_) {throw std::runtime_error("overflowing window for one sided operation");}
     MPI_Put(buffer.data(), buffer.size_bytes(), MPI_BYTE,
-            dest_, currentOffset_, buffer.size_bytes(), MPI_BYTE, window_);
+            dest_, offset, buffer.size_bytes(), MPI_BYTE, window_);
 
-    putRegions.push_back({currentOffset_, static_cast<int>(buffer.size_bytes())});
+    putRegions.push_back({offset, static_cast<int>(buffer.size_bytes())});
     currentOffset_ += buffer.size_bytes();
   }
 
@@ -274,15 +277,45 @@ void MPIChannel::putTrivialProduct_(
   auto regions = wrapper->trivialCopyRegions();
   for (const auto& region : regions) {
     assert(region.data() != nullptr);
-    MPI_Put(region.data(), region.size_bytes(), MPI_BYTE,
-            dest_, currentOffset_, region.size_bytes(), MPI_BYTE, window_);
+    offset = currentOffset_.fetch_add(buffer.size_bytes());
+    if (offset > windowSize_) {throw std::runtime_error("overflowing window for one sided operation");}
 
-    putRegions.push_back({currentOffset_, static_cast<int>(region.size_bytes())});
-    currentOffset_ += region.size_bytes();
+    MPI_Put(region.data(), region.size_bytes(), MPI_BYTE,
+            dest_, offset, region.size_bytes(), MPI_BYTE, window_);
+
+    putRegions.push_back({offset, static_cast<int>(region.size_bytes())});
   }
 
-  MPI_Win_unlock(dest_, window_);
 }
+
+void MPIChannel::sendRegions(int instance, std::vector<OffsetSizePair>& putRegions) {
+  int tag = EDM_MPI_FinishedPuttingProduct | instance * EDM_MPI_MessageTagWidth_;
+  MPI_Send(
+    putRegions.data(),                      // pointer to the first element
+    putRegions.size() * sizeof(OffsetSizePair), // total byte size
+    MPI_BYTE, dest_, tag, comm_
+  );
+}
+
+std::vector<OffsetSizePair> MPIChannel::receiveRegions(int instance) {
+  int tag = EDM_MPI_FinishedPuttingProduct | instance * EDM_MPI_MessageTagWidth_;
+  MPI_Message message;
+  MPI_Status status;
+  MPI_Mprobe(dest_, tag, comm_, &message, &status);
+
+  int size;
+  MPI_Get_count(&status, MPI_BYTE, &size);
+
+  // Now compute how many OffsetSizePair elements that represents
+  assert(size % sizeof(OffsetSizePair) == 0);  // Optional sanity check
+  int count = size / sizeof(OffsetSizePair);
+
+  std::vector<OffsetSizePair> putRegions(count);
+  MPI_Mrecv(putRegions.data(), size, MPI_BYTE, &message, MPI_STATUS_IGNORE);
+
+  return putRegions;
+}
+
 
 void MPIChannel::serializeAndPutProduct_(
   int instance,
@@ -295,24 +328,18 @@ void MPIChannel::serializeAndPutProduct_(
   type->Streamer(const_cast<void*>(product), buffer);
   int dataSize = buffer.Length();
 
-  // Lock the window for exclusive RMA access
-  MPI_Win_lock(MPI_LOCK_EXCLUSIVE, dest_, 0, window_);
-
   // Ensure we don’t overflow the window buffer
   assert(currentOffset_ + dataSize <= windowSize_);
 
   // Put the serialized data into the window at current offset
+  offset = currentOffset_.fetch_add(dataSize);
+  if (offset > windowSize_) {throw std::runtime_error("overflowing window for one sided operation");}
+
   MPI_Put(buffer.Buffer(), dataSize, MPI_BYTE,
-          dest_, currentOffset_, dataSize, MPI_BYTE, window_);
+          dest_, offset, dataSize, MPI_BYTE, window_);
 
   // Save offset for metadata
-  putRegions.push_back({currentOffset_, static_cast<int>dataSize});
-
-  // Update current offset
-  currentOffset_ += dataSize;
-
-  // Unlock the window
-  MPI_Win_unlock(dest_, window_);
+  putRegions.push_back({offset, static_cast<int>dataSize});
 }
 
 

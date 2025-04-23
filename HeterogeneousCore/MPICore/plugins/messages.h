@@ -24,6 +24,7 @@ enum EDM_MPI_MessageTag {
   EDM_MPI_SendSerializedProduct,
   EDM_MPI_SendTrivialProduct,
   EDM_MPI_SendTrivialCopyProduct,
+  EDM_MPI_FinishedPuttingProduct,
   EDM_MPI_SkipProduct,
   EDM_MPI_SendComplete,
   EDM_MPI_MessageTagCount_

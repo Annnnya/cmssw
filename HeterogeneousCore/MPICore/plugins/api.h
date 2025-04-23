@@ -107,6 +107,8 @@ public:
     }
   }
 
+  void sendRegions(int instance, std::vector<OffsetSizePair>& putRegions);
+
   // transfer a wrapped object using the TrivialCopyTraits or its ROOT dictionary
   void sendProduct(int instance, edm::TypeWithDict const& type, edm::WrapperBase const& wrapper) {
     if (wrapper.hasTrivialCopyTraits()) {
