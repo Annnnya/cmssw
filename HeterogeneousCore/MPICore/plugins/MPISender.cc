@@ -94,7 +94,7 @@ public:
       // note: currently this uses a blocking send
       token.channel()->putProduct(instance_, entry.wrappedType, *wrapper, putRegions);
     }
-    token.channel()->flush();
+    // token.channel()->flush();
     token.channel()->sendRegions(instance_, putRegions);
 
     // write a shallow copy of the channel to the output, so other modules can consume it

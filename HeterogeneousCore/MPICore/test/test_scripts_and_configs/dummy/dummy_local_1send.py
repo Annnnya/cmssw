@@ -76,7 +76,7 @@ process.mpiController.run_local = cms.untracked.bool(True)
 
 # Dummy producer
 process.dummyProducer = cms.EDProducer("DummyProducer",
-    sizeInBytes=cms.uint32(1024)
+    sizeInBytes=cms.uint32(1024*1024)
 )
 
 # MPI sender

@@ -283,7 +283,7 @@ private:
 
   std::atomic<MPI_Aint> currentOffset_ = 0;
   std::vector<char> windowBuffer_;
-  MPI_Win window_;
+  MPI_Win window_ = MPI_WIN_NULL;
   MPI_Aint windowSize_ = 5 * 1024 * 1024;
 };
 

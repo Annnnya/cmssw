@@ -299,13 +299,16 @@ void MPIChannel::serializeAndPutProduct_(
   int dataSize = buffer.Length();
 
   MPI_Aint offset;
+  // std::cerr << "serialized put" << std::endl;
 
   // Put the serialized data into the window at current offset
   offset = currentOffset_.fetch_add(dataSize);
   if (currentOffset_ > windowSize_) {throw std::runtime_error("overflowing window for one sided operation");}
 
+  // std::cerr << "serialized put before" << std::endl;
   MPI_Put(buffer.Buffer(), dataSize, MPI_BYTE,
           dest_, offset, dataSize, MPI_BYTE, window_);
+  // std::cerr << "serialized put after" << std::endl;
 
   // Save offset for metadata
   putRegions.push_back({offset, static_cast<int>(dataSize)});
@@ -319,6 +322,7 @@ void MPIChannel::sendRegions(int instance, std::vector<OffsetSizePair>& putRegio
     putRegions.size() * sizeof(OffsetSizePair), // total byte size
     MPI_BYTE, dest_, tag, comm_
   );
+  // MPI_Win_fence(0, window_);
 }
 
 std::vector<OffsetSizePair> MPIChannel::receiveRegions(int instance) {
@@ -336,6 +340,8 @@ std::vector<OffsetSizePair> MPIChannel::receiveRegions(int instance) {
 
   std::vector<OffsetSizePair> putRegions(count);
   MPI_Mrecv(putRegions.data(), size, MPI_BYTE, &message, MPI_STATUS_IGNORE);
+  // MPI_Win_fence(0, window_);
+
 
   return putRegions;
 }
@@ -348,30 +354,29 @@ void MPIChannel::readTrivialProductFromWindow_(
 ) {
   wrapper->markAsPresent();
 
-  // Step 1: Read trivial copy parameters if needed
+  // Step 1: Copy trivial copy parameters if needed
   if (wrapper->hasTrivialCopyProperties()) {
     edm::AnyBuffer buffer = wrapper->trivialCopyParameters();
     const auto& region = putRegions[regionIndex++];
     assert(static_cast<size_t>(region.size) == buffer.size_bytes());
 
-    MPI_Get(buffer.data(), buffer.size_bytes(), MPI_BYTE,
-            dest_, region.offset, buffer.size_bytes(), MPI_BYTE, window_);
+    std::memcpy(buffer.data(), windowBuffer_.data() + region.offset, buffer.size_bytes());
 
     wrapper->trivialCopyInitialize(buffer);
   }
 
-  // Step 2: Read memory regions
+  // Step 2: Copy memory regions
   auto regions = wrapper->trivialCopyRegions();
   for (size_t i = 0; i < regions.size(); ++i, ++regionIndex) {
     const auto& region = putRegions[regionIndex];
     assert(regions[i].size_bytes() == static_cast<size_t>(region.size));
 
-    MPI_Get(regions[i].data(), regions[i].size_bytes(), MPI_BYTE,
-            dest_, region.offset, regions[i].size_bytes(), MPI_BYTE, window_);
+    std::memcpy(regions[i].data(), windowBuffer_.data() + region.offset, regions[i].size_bytes());
   }
 
   wrapper->trivialCopyFinalize();
 }
+
 
 
 void MPIChannel::readSerializedProductFromWindow_(
@@ -382,13 +387,7 @@ void MPIChannel::readSerializedProductFromWindow_(
   size_t& regionIndex
 ) {
   const auto& region = putRegions[regionIndex++];
-
-  std::vector<char> buffer(region.size);
-
-  MPI_Get(buffer.data(), buffer.size(), MPI_BYTE,
-          dest_, region.offset, buffer.size(), MPI_BYTE, window_);
-
-  TBufferFile rootBuffer(TBuffer::kRead, buffer.size(), buffer.data(), kFALSE);
+  TBufferFile rootBuffer(TBuffer::kRead, region.size, windowBuffer_.data()+region.offset, kFALSE);
   type->Streamer(product, rootBuffer);
 }
 
@@ -397,10 +396,12 @@ void MPIChannel::readSerializedProductFromWindow_(
 void MPIChannel::allocateWindow() {
   windowBuffer_.resize(windowSize_);
   MPI_Win_create(windowBuffer_.data(), windowSize_, 1, MPI_INFO_NULL, comm_, &window_);
+  MPI_Win_fence(0, window_);
 }
 
 void MPIChannel::freeWindow() {
   if (window_ != MPI_WIN_NULL) {
+    MPI_Win_fence(0, window_);
     MPI_Win_free(&window_);
     window_ = MPI_WIN_NULL;
   }
