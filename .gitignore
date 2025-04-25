@@ -24,5 +24,6 @@ __init__.py
 
 HeterogeneousCore/MPICore/test/profiling_results
 /HeterogeneousCore/MPICore/test/test_scripts_and_configs/real/run*
-*/run383631/*
+**/run383631/
+
 

@@ -1,36 +1,54 @@
 # average_dummy_results.py
 
 import os
+import sys
 import json
+import re
 import pandas as pd
 from collections import defaultdict
 
-# Base directory from your bash script
-experiment_name = "test_results_thesis/local-remote_t-s-c_different-sockets""
-base_dir = f"../{experiment_name}"
-mode = "local"
+# === CONFIGURATION ===
+
+if len(sys.argv) != 2:
+    print("Usage: python average_dummy_results.py <path_to_results>")
+    sys.exit(1)
+
+base_dir = sys.argv[1]
+
+prefixes = ["local_", "remote_", "whole_"]
+
+# === FUNCTIONS ===
 
 def find_all_json_files(base_dir, prefix):
     grouped_entries = defaultdict(list)
 
     for root, _, files in os.walk(base_dir):
-        for fname in sorted(files):  # Ensure sorted for consistent warmup exclusion
-            if fname.endswith(".json") and fname.startswith(prefix):
-                try:
-                    parts = os.path.relpath(root, base_dir).split("_")
-                    comm_type = parts[1]
-                    t_s_part = parts[2][1:]  # e.g., "8s4"
-                    threads, streams = t_s_part.split("s")
+        rel_root = os.path.relpath(root, base_dir)
 
-                    with open(os.path.join(root, fname)) as f:
+        if rel_root == ".":
+            continue  # Skip base directory itself
+
+        folder = os.path.basename(root)
+        print(folder)
+        folder_match = re.match(r'.*_t(\d+)s(\d+)', folder)
+        if not folder_match:
+            print("skip")
+            continue  # skip non-test folders
+
+        threads, streams = map(int, folder_match.groups())
+
+        for fname in sorted(files):
+            print(fname)
+            if fname.endswith(".json") and fname.startswith(prefix):
+                full_path = os.path.join(root, fname)
+
+                try:
+                    with open(full_path) as f:
                         data = json.load(f)
 
                     events = data.get("total", {}).get("events", 1)
                     recv_modules = [m for m in data["modules"] if m.get("type") == "MPIReceiver"]
                     send_modules = [m for m in data["modules"] if m.get("type") == "MPISender"]
-
-                    if not recv_modules and not send_modules:
-                        continue  # Skip if neither sender nor receiver is found
 
                     entry = {}
 
@@ -45,29 +63,27 @@ def find_all_json_files(base_dir, prefix):
                     entry["total_cpu"] = data.get("total", {}).get("time_thread", 0.0) / events
                     entry["total_real"] = data.get("total", {}).get("time_real", 0.0) / events
 
-                    key = (comm_type, int(threads), int(streams))
+                    key = (threads, streams)
                     grouped_entries[key].append(entry)
 
                 except Exception as e:
-                    print(f"Error in {fname}: {e}")
+                    print(f"Error in {full_path}: {e}")
                     continue
-    return grouped_entries
 
-import re
-from collections import defaultdict
+    return grouped_entries
 
 def parse_throughput_file(filepath):
     throughput_data = defaultdict(list)
     pattern = re.compile(
-        r"\[THROUGHPUT\] comm_(\w+)_t(\d+)s(\d+)_r(\d+) \| avg: ([\d.]+) ± ([\d.]+) ev/s"
+        r"\[THROUGHPUT\] .*_t(\d+)s(\d+)_r(\d+) \| avg: ([\d.]+)"
     )
 
     with open(filepath) as f:
         for line in f:
             match = pattern.search(line)
             if match:
-                comm, threads, streams, run_id, avg_val, _ = match.groups()
-                key = (comm, int(threads), int(streams))
+                threads, streams, run_id, avg_val = match.groups()
+                key = (int(threads), int(streams))
                 throughput_data[key].append((int(run_id), float(avg_val)))
 
     # Discard warmup (first run by run_id) and average the rest
@@ -81,18 +97,15 @@ def parse_throughput_file(filepath):
 
     return throughput_avg
 
-
-
 def summarize(grouped_entries):
     summary = []
-    for (comm, th, st), group in grouped_entries.items():
+    for (th, st), group in grouped_entries.items():
         if len(group) <= 1:
-            continue  # Not enough runs to discard warmup
+            continue  # not enough runs
 
-        df = pd.DataFrame(group[1:])  # Discard first entry (warmup)
+        df = pd.DataFrame(group[1:])  # discard warmup
         avg = df.mean(numeric_only=True).to_dict()
         avg.update({
-            "comm": comm,
             "threads": th,
             "streams": st
         })
@@ -100,30 +113,39 @@ def summarize(grouped_entries):
 
     return pd.DataFrame(summary)
 
-grouped = find_all_json_files(base_dir, f"{mode}_")
-summary_df = summarize(grouped)
-summary_df.sort_values(by=["comm", "threads", "streams"], inplace=True)
-
-throughput_path = os.path.join(base_dir, "throughputs.txt")
-throughput_avg = parse_throughput_file(throughput_path)
-
-# Add throughput to summary
 def attach_throughput(summary_df, throughput_avg):
     summary_df["throughput_ev_per_s"] = summary_df.apply(
         lambda row: throughput_avg.get(
-            (row["comm"], row["threads"], row["streams"]), None
+            (row["threads"], row["streams"]), None
         ),
         axis=1
     )
     return summary_df
 
-summary_df = attach_throughput(summary_df, throughput_avg)
+# === MAIN ===
 
+for prefix in prefixes:
+    print(f"\nProcessing prefix: {prefix}")
 
-# Save output
-csv_path = os.path.join(base_dir, f"{mode}_summary_table.csv")
-json_path = os.path.join(base_dir, f"{mode}_summary_table.json")
-summary_df.to_csv(csv_path, index=False)
-summary_df.to_json(json_path, orient="records", indent=2)
+    grouped = find_all_json_files(base_dir, prefix)
+    if not grouped:
+        print(f"No data found for prefix {prefix}, skipping.")
+        continue
 
-print(f"Saved summary to:\n- {csv_path}\n- {json_path}")
+    summary_df = summarize(grouped)
+    summary_df.sort_values(by=["threads", "streams"], inplace=True)
+
+    throughput_path = os.path.join(base_dir, "throughputs.txt")
+    throughput_avg = parse_throughput_file(throughput_path)
+    summary_df = attach_throughput(summary_df, throughput_avg)
+
+    # Save output
+    output_csv = os.path.join(base_dir, f"{prefix.strip('_')}_summary_table.csv")
+    output_json = os.path.join(base_dir, f"{prefix.strip('_')}_summary_table.json")
+
+    summary_df.to_csv(output_csv, index=False)
+    summary_df.to_json(output_json, orient="records", indent=2)
+
+    print(f"✅ Saved summary to:\n- {output_csv}\n- {output_json}")
+
+print("\n🎉 All summaries processed successfully!")
