@@ -11,8 +11,8 @@ process.source = cms.Source("MPISource",
 process.maxEvents = cms.untracked.PSet(input=cms.untracked.int32(-1))
 
 # Concurrency
-process.options.numberOfThreads = int(os.environ.get("EXPERIMENT_THREADS", 4))
-process.options.numberOfStreams = int(os.environ.get("EXPERIMENT_STREAMS", 4))
+process.options.numberOfThreads = int(os.environ.get("EXPERIMENT_THREADS", 2))
+process.options.numberOfStreams = int(os.environ.get("EXPERIMENT_STREAMS", 2))
 process.options.numberOfConcurrentLuminosityBlocks = 1
 process.options.wantSummary = False
 
@@ -52,6 +52,17 @@ process.FastTimerService = cms.Service( "FastTimerService",
     dqmModuleMemoryResolution = cms.untracked.double( 500.0 ),
     dqmLumiSectionsRange = cms.untracked.uint32( 2500 ),
     dqmPath = cms.untracked.string( "HLT/TimerService" ),
+)
+
+process.ThroughputService = cms.Service( "ThroughputService",
+    eventRange = cms.untracked.uint32( 10000 ),
+    eventResolution = cms.untracked.uint32( 50 ),
+    printEventSummary = cms.untracked.bool( False ),
+    enableDQM = cms.untracked.bool( True ),
+    dqmPathByProcesses = cms.untracked.bool( True ),
+    dqmPath = cms.untracked.string( "HLT/Throughput" ),
+    timeRange = cms.untracked.double( 60000.0 ),
+    timeResolution = cms.untracked.double( 5.828 )
 )
 
 process.FastTimerService.writeJSONSummary = True

@@ -1,0 +1,108 @@
+{
+  "modules": [
+    {
+      "events": 10000,
+      "label": "source",
+      "mem_alloc": 62301,
+      "mem_free": 17349,
+      "time_real": 540.736163,
+      "time_thread": 247.185693,
+      "type": "MPISource"
+    },
+    {
+      "events": 10000,
+      "label": "TriggerResults",
+      "mem_alloc": 1875,
+      "mem_free": 234,
+      "time_real": 16.201207,
+      "time_thread": 16.179493,
+      "type": "TriggerResultInserter"
+    },
+    {
+      "events": 10000,
+      "label": "remotePath",
+      "mem_alloc": 703,
+      "mem_free": 234,
+      "time_real": 18.986932,
+      "time_thread": 19.087136,
+      "type": "PathStatusInserter"
+    },
+    {
+      "events": 10000,
+      "label": "remoteDummyReceiver1",
+      "mem_alloc": 23134682,
+      "mem_free": 12844011,
+      "time_real": 4217.301777,
+      "time_thread": 2403.668171,
+      "type": "MPIReceiver"
+    },
+    {
+      "events": 10000,
+      "label": "remoteDummyReceiver2",
+      "mem_alloc": 40893,
+      "mem_free": 27645,
+      "time_real": 520.404773,
+      "time_thread": 174.08762,
+      "type": "MPIReceiver"
+    },
+    {
+      "events": 10000,
+      "label": "remoteDummyReceiver3",
+      "mem_alloc": 51818,
+      "mem_free": 33182,
+      "time_real": 1063.959979,
+      "time_thread": 321.304257,
+      "type": "MPIReceiver"
+    },
+    {
+      "events": 10000,
+      "label": "other",
+      "mem_alloc": 321359,
+      "mem_free": 9930011,
+      "time_real": 3987.295126,
+      "time_thread": 2003.777022,
+      "type": "other"
+    },
+    {
+      "events": 10000,
+      "label": "eventsetup",
+      "mem_alloc": 0,
+      "mem_free": 0,
+      "time_real": 0.0,
+      "time_thread": 0.0,
+      "type": "eventsetup"
+    },
+    {
+      "events": 10000,
+      "label": "idle",
+      "mem_alloc": 6734457,
+      "mem_free": 6913244,
+      "time_real": 284.793348,
+      "time_thread": 8247.597947,
+      "type": "idle"
+    }
+  ],
+  "resources": [
+    {
+      "time_real": "real time"
+    },
+    {
+      "time_thread": "cpu time"
+    },
+    {
+      "mem_alloc": "allocated memory"
+    },
+    {
+      "mem_free": "deallocated memory"
+    }
+  ],
+  "total": {
+    "events": 10000,
+    "label": "DUMMYREMOTE",
+    "mem_alloc": 30348090,
+    "mem_free": 29765914,
+    "time_real": 10649.679305,
+    "time_thread": 13432.887339,
+    "type": "Job"
+  }
+}

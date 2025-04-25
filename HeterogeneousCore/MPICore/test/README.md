@@ -58,8 +58,8 @@ mpirun --mca pmix_server_uri file:server.uri -n 1 -bind-to none \
 cd $CMSSW_BASE/src/HeterogeneousCore/MPICore/test/test_scripts_and_configs/real/
 
 mpirun --mca pml ob1 --mca btl vader,tcp,self \
-  -np 1 numactl -N 6 cmsRun hlt_remote.py : \
-  -np 1 numactl -N 6 cmsRun hlt_local.py
+  -np 1 numactl -N 6 env EXPERIMENT_THREADS=4 EXPERIMENT_STREAMS=4 cmsRun hlt_remote.py : \
+  -np 1 numactl -N 6 env EXPERIMENT_THREADS=4 EXPERIMENT_STREAMS=4  cmsRun hlt_local.py
 ```
 
 ### Useful Flags

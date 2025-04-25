@@ -25,7 +25,7 @@ output_dir = os.environ.get("EXPERIMENT_OUTPUT_DIR", "./test_results/local_pipel
 process.options.numberOfThreads = threads
 process.options.numberOfStreams = streams
 process.options.numberOfConcurrentLuminosityBlocks = 2
-process.maxEvents.input = 10300
+process.maxEvents.input = 10000 #1k
 
 # create the DAQ working directory for DQMFileSaverPB
 os.makedirs('%s/run%d' % (process.EvFDaqDirector.baseDir.value(), process.EvFDaqDirector.runNumber.value()), exist_ok=True)
