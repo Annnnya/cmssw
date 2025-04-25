@@ -24,8 +24,17 @@ struct OffsetSizePair{
 class MPIChannel {
 public:
   MPIChannel() = default;
-  MPIChannel(MPI_Comm comm, int destination) : comm_(comm), dest_(destination) { allocateWindow(); }
+  MPIChannel(MPI_Comm comm, int destination) : comm_(comm), dest_(destination), currentOffset_(0) { allocateWindow(); }
   ~MPIChannel(){ freeWindow(); }
+  MPIChannel& operator=(const MPIChannel& other) {
+    if (this != &other) {
+      comm_ = other.comm_;
+      dest_ = other.dest_;
+      currentOffset_ = 0;  // reset or copy as needed
+      // mutex_ is default-constructed, nothing to assign
+    }
+    return *this;
+  }
 
   // build a new MPIChannel that uses a duplicate of the underlying communicator and the same destination
   MPIChannel duplicate() const;
@@ -45,7 +54,7 @@ public:
   // signal the end of stream
   void sendEndStream() { sendEmpty_(EDM_MPI_EndStream); }
 
-  // signal a new run, and transmit the RunAuxiliary
+  // signal a new run, and transmit the RunAuxiliafry
   void sendBeginRun(edm::RunAuxiliary const& aux) { sendRunAuxiliary_(EDM_MPI_BeginRun, aux); }
 
   // signal the end of run, and re-transmit the RunAuxiliary
@@ -101,13 +110,32 @@ public:
 
   void putProduct(int instance, edm::TypeWithDict const& type, edm::WrapperBase const& wrapper, std::vector<OffsetSizePair>& putRegions){
     if (wrapper.hasTrivialCopyTraits()) {
-      putTrivialProduct_(instance, wrapper, putRegions);
+      putTrivialProduct_(instance, &wrapper, putRegions);
     } else {
       serializeAndPutProduct_(instance, type.getClass(), &wrapper, putRegions);
     }
   }
 
+
+  
+  void getProductFromWindow(
+    int instance,
+    edm::TypeWithDict const& type,
+    edm::WrapperBase& wrapper,
+    const std::vector<OffsetSizePair>& putRegions,
+    size_t& regionIndex
+  ) {
+    if (wrapper.hasTrivialCopyTraits()) {
+      readTrivialProductFromWindow_(instance, &wrapper, putRegions, regionIndex);
+    } else {
+      readSerializedProductFromWindow_(instance, type.getClass(), &wrapper, putRegions, regionIndex);
+    }
+  }
+  
+
+  std::vector<OffsetSizePair> receiveRegions(int instance);
   void sendRegions(int instance, std::vector<OffsetSizePair>& putRegions);
+
 
   // transfer a wrapped object using the TrivialCopyTraits or its ROOT dictionary
   void sendProduct(int instance, edm::TypeWithDict const& type, edm::WrapperBase const& wrapper) {
@@ -158,6 +186,8 @@ public:
       receiveSerializedProduct_(instance, type.getClass(), &wrapper);
     }
   }
+
+  void flush();
 
 private:
   // serialize an EDM object to a simplified representation that can be transmitted as an MPI message
@@ -220,17 +250,30 @@ private:
 
   // transfer a wrapped object using its TrivialCopyTraits
   void sendTrivialCopyProduct_(int instance, edm::WrapperBase const* wrapper);
-
-  
-  void MPIChannel::putTrivialProduct_(int instance, edm::WrapperBase const* wrapper, std::vector<OffsetSizePair>& putRegions);
-  void MPIChannel::serializeAndPutProduct_(int instance, TClass const* type, void const* product, std::vector<OffsetSizePair>& putRegions);
-
   // receive a wrapped object using its TrivialCopyTraits
   void receiveTrivialCopyProduct_(int instance, edm::WrapperBase* wrapper);
 
+
+  
+  void putTrivialProduct_(int instance, edm::WrapperBase const* wrapper, std::vector<OffsetSizePair>& putRegions);
+  void serializeAndPutProduct_(int instance, TClass const* type, void const* product, std::vector<OffsetSizePair>& putRegions);
+
+  void readSerializedProductFromWindow_(
+    int instance,
+    TClass const* type,
+    void* product,
+    const std::vector<OffsetSizePair>& putRegions,
+    size_t& regionIndex
+  );
+  void readTrivialProductFromWindow_(
+    int instance,
+    edm::WrapperBase* wrapper,
+    const std::vector<OffsetSizePair>& putRegions,
+    size_t& regionIndex
+  );
+
   void allocateWindow(); // allocate memory and attach to window
   void freeWindow();     // cleanup
-  void flush();
 
   // MPI intercommunicator
   MPI_Comm comm_ = MPI_COMM_NULL;

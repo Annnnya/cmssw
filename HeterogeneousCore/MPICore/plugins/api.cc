@@ -265,19 +265,18 @@ void MPIChannel::putTrivialProduct_(
   if (wrapper->hasTrivialCopyProperties()) {
     edm::AnyBuffer buffer = wrapper->trivialCopyParameters();
     offset = currentOffset_.fetch_add(buffer.size_bytes());
-    if (offset > windowSize_) {throw std::runtime_error("overflowing window for one sided operation");}
+    if (currentOffset_ > windowSize_) {throw std::runtime_error("overflowing window for one sided operation");}
     MPI_Put(buffer.data(), buffer.size_bytes(), MPI_BYTE,
             dest_, offset, buffer.size_bytes(), MPI_BYTE, window_);
 
     putRegions.push_back({offset, static_cast<int>(buffer.size_bytes())});
-    currentOffset_ += buffer.size_bytes();
   }
 
   // Put all regions
   auto regions = wrapper->trivialCopyRegions();
   for (const auto& region : regions) {
     assert(region.data() != nullptr);
-    offset = currentOffset_.fetch_add(buffer.size_bytes());
+    offset = currentOffset_.fetch_add(region.size_bytes());
     if (offset > windowSize_) {throw std::runtime_error("overflowing window for one sided operation");}
 
     MPI_Put(region.data(), region.size_bytes(), MPI_BYTE,
@@ -287,6 +286,31 @@ void MPIChannel::putTrivialProduct_(
   }
 
 }
+
+void MPIChannel::serializeAndPutProduct_(
+  int instance,
+  TClass const* type,
+  void const* product,
+  std::vector<OffsetSizePair>& putRegions
+  ) {
+  // Serialize the product into a ROOT buffer
+  TBufferFile buffer(TBuffer::kWrite);
+  type->Streamer(const_cast<void*>(product), buffer);
+  int dataSize = buffer.Length();
+
+  MPI_Aint offset;
+
+  // Put the serialized data into the window at current offset
+  offset = currentOffset_.fetch_add(dataSize);
+  if (currentOffset_ > windowSize_) {throw std::runtime_error("overflowing window for one sided operation");}
+
+  MPI_Put(buffer.Buffer(), dataSize, MPI_BYTE,
+          dest_, offset, dataSize, MPI_BYTE, window_);
+
+  // Save offset for metadata
+  putRegions.push_back({offset, static_cast<int>(dataSize)});
+}
+
 
 void MPIChannel::sendRegions(int instance, std::vector<OffsetSizePair>& putRegions) {
   int tag = EDM_MPI_FinishedPuttingProduct | instance * EDM_MPI_MessageTagWidth_;
@@ -316,31 +340,58 @@ std::vector<OffsetSizePair> MPIChannel::receiveRegions(int instance) {
   return putRegions;
 }
 
+void MPIChannel::readTrivialProductFromWindow_(
+  int instance,
+  edm::WrapperBase* wrapper,
+  const std::vector<OffsetSizePair>& putRegions,
+  size_t& regionIndex
+) {
+  wrapper->markAsPresent();
 
-void MPIChannel::serializeAndPutProduct_(
+  // Step 1: Read trivial copy parameters if needed
+  if (wrapper->hasTrivialCopyProperties()) {
+    edm::AnyBuffer buffer = wrapper->trivialCopyParameters();
+    const auto& region = putRegions[regionIndex++];
+    assert(static_cast<size_t>(region.size) == buffer.size_bytes());
+
+    MPI_Get(buffer.data(), buffer.size_bytes(), MPI_BYTE,
+            dest_, region.offset, buffer.size_bytes(), MPI_BYTE, window_);
+
+    wrapper->trivialCopyInitialize(buffer);
+  }
+
+  // Step 2: Read memory regions
+  auto regions = wrapper->trivialCopyRegions();
+  for (size_t i = 0; i < regions.size(); ++i, ++regionIndex) {
+    const auto& region = putRegions[regionIndex];
+    assert(regions[i].size_bytes() == static_cast<size_t>(region.size));
+
+    MPI_Get(regions[i].data(), regions[i].size_bytes(), MPI_BYTE,
+            dest_, region.offset, regions[i].size_bytes(), MPI_BYTE, window_);
+  }
+
+  wrapper->trivialCopyFinalize();
+}
+
+
+void MPIChannel::readSerializedProductFromWindow_(
   int instance,
   TClass const* type,
-  void const* product,
-  std::vector<OffsetSizePair>& putRegions
-  ) {
-  // Serialize the product into a ROOT buffer
-  TBufferFile buffer(TBuffer::kWrite);
-  type->Streamer(const_cast<void*>(product), buffer);
-  int dataSize = buffer.Length();
+  void* product,
+  const std::vector<OffsetSizePair>& putRegions,
+  size_t& regionIndex
+) {
+  const auto& region = putRegions[regionIndex++];
 
-  // Ensure we don’t overflow the window buffer
-  assert(currentOffset_ + dataSize <= windowSize_);
+  std::vector<char> buffer(region.size);
 
-  // Put the serialized data into the window at current offset
-  offset = currentOffset_.fetch_add(dataSize);
-  if (offset > windowSize_) {throw std::runtime_error("overflowing window for one sided operation");}
+  MPI_Get(buffer.data(), buffer.size(), MPI_BYTE,
+          dest_, region.offset, buffer.size(), MPI_BYTE, window_);
 
-  MPI_Put(buffer.Buffer(), dataSize, MPI_BYTE,
-          dest_, offset, dataSize, MPI_BYTE, window_);
-
-  // Save offset for metadata
-  putRegions.push_back({offset, static_cast<int>dataSize});
+  TBufferFile rootBuffer(TBuffer::kRead, buffer.size(), buffer.data(), kFALSE);
+  type->Streamer(product, rootBuffer);
 }
+
 
 
 void MPIChannel::allocateWindow() {

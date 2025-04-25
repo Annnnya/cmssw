@@ -96,10 +96,10 @@ MPIController::MPIController(edm::ParameterSet const& config)
       throw cms::Exception("UnsupportedFeature")
           << "MPIController supports only a single follower, but it was connected to " << size << " followers";
     }
-    channel_ = MPIChannel(comm_, 0);
+    channel_ = std::move(MPIChannel(comm_, 0));
   } else {
     comm_ = MPI_COMM_WORLD;
-    channel_ = MPIChannel(comm_, 0);
+    channel_ = std::move(MPIChannel(comm_, 0));
     int world_rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
     std::cout << "MPI Controller Rank: " << world_rank << " in MPI_COMM_WORLD" << std::endl;
