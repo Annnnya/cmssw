@@ -269,6 +269,7 @@ void MPISource::produce(edm::Event& event) {
     ptr->reset();
     delete ptr;
   });
+  channel->allocateWindow();
   event.emplace(token_, std::move(channel));
 }
 

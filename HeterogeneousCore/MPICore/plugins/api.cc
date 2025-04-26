@@ -316,6 +316,8 @@ void MPIChannel::serializeAndPutProduct_(
 
 
 void MPIChannel::sendRegions(int instance, std::vector<OffsetSizePair>& putRegions) {
+  // MPI_Win_fence(0, window_);
+  // flush();
   int tag = EDM_MPI_FinishedPuttingProduct | instance * EDM_MPI_MessageTagWidth_;
   MPI_Send(
     putRegions.data(),                      // pointer to the first element
@@ -326,6 +328,7 @@ void MPIChannel::sendRegions(int instance, std::vector<OffsetSizePair>& putRegio
 }
 
 std::vector<OffsetSizePair> MPIChannel::receiveRegions(int instance) {
+  // MPI_Win_fence(0, window_);
   int tag = EDM_MPI_FinishedPuttingProduct | instance * EDM_MPI_MessageTagWidth_;
   MPI_Message message;
   MPI_Status status;
@@ -340,7 +343,6 @@ std::vector<OffsetSizePair> MPIChannel::receiveRegions(int instance) {
 
   std::vector<OffsetSizePair> putRegions(count);
   MPI_Mrecv(putRegions.data(), size, MPI_BYTE, &message, MPI_STATUS_IGNORE);
-  // MPI_Win_fence(0, window_);
 
 
   return putRegions;

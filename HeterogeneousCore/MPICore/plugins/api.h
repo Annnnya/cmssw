@@ -105,7 +105,7 @@ public:
       sendSerializedProduct_(instance, product.typeOf().getClass(), product.address());
     } else {
       sendTrivialProduct_(instance, product);
-    }
+    } 
   }
 
   void putProduct(int instance, edm::TypeWithDict const& type, edm::WrapperBase const& wrapper, std::vector<OffsetSizePair>& putRegions){
