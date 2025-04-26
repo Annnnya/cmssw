@@ -4,16 +4,16 @@
 runs=5
 
 # Threads/Streams combinations to test
-thread_stream_combos=("4:4" "8:8" "16:16" "32:32" "64:64" "128:128" "256:256")
+thread_stream_combos=("1:1" "4:4" "8:8" "16:16" "32:32" "64:64" "96:96" "128:128")
 
 # NUMA node configurations (can be single or multiple nodes like "6", "6-7", "45-67")
-numa_nodes=("6" "6,7")
+# numa_nodes=("6" "6,7")
 
 # Script to run
 local_script_name="hlt_test.py"
 
 # Base directory for logs
-BASE_DIR="../../test_results/local_thread_numa_dependence"
+BASE_DIR="../../test_results/local_thread_numa"
 mkdir -p "$BASE_DIR"
 
 for combo in "${thread_stream_combos[@]}"; do
