@@ -11,7 +11,7 @@ script_local="hlt_local.py"
 script_remote="hlt_remote.py"
 
 # Base directory for logs
-BASE_DIR="../../test_results_thesis/milan-genoa_ucx_t-s-c"
+BASE_DIR="../../test_results_thesis/simple_async/milan-genoa_ucx_t-s-c"
 mkdir -p "$BASE_DIR"
 
 # Hostnames

@@ -11,7 +11,7 @@ script_local="hlt_local.py"
 script_remote="hlt_remote.py"
 
 # Base directory for logs
-BASE_DIR="../../test_results_thesis/local-remote_t-s-c_same_cores"
+BASE_DIR="../../test_results_thesis/simple_async/local-remote_t-s-c_same_cores"
 mkdir -p "$BASE_DIR"
 
 
