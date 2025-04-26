@@ -5,11 +5,11 @@ process = cms.Process("DUMMYLOCAL")
 
 # Event source: Empty
 process.source = cms.Source("EmptySource")
-process.maxEvents = cms.untracked.PSet(input=cms.untracked.int32(1000))
+process.maxEvents = cms.untracked.PSet(input=cms.untracked.int32(10000))
 
 # Concurrency settings (optional, can use env)
-process.options.numberOfThreads = int(os.environ.get("EXPERIMENT_THREADS", 4))
-process.options.numberOfStreams = int(os.environ.get("EXPERIMENT_STREAMS", 4))
+process.options.numberOfThreads = int(os.environ.get("EXPERIMENT_THREADS", 2))
+process.options.numberOfStreams = int(os.environ.get("EXPERIMENT_STREAMS", 2))
 process.options.numberOfConcurrentLuminosityBlocks = 1
 process.options.wantSummary = False
 
@@ -53,7 +53,7 @@ process.FastTimerService = cms.Service( "FastTimerService",
 
 process.ThroughputService = cms.Service( "ThroughputService",
     eventRange = cms.untracked.uint32( 10000 ),
-    eventResolution = cms.untracked.uint32( 1 ),
+    eventResolution = cms.untracked.uint32( 50 ),
     printEventSummary = cms.untracked.bool( False ),
     enableDQM = cms.untracked.bool( True ),
     dqmPathByProcesses = cms.untracked.bool( True ),
@@ -76,7 +76,7 @@ process.mpiController.run_local = cms.untracked.bool(True)
 
 # Dummy producer
 process.dummyProducer1 = cms.EDProducer("DummyProducer",
-    sizeInBytes=cms.uint32(1024)
+    sizeInBytes=cms.uint32(1024*1024)
 )
 
 process.dummyProducer2 = cms.EDProducer("DummyProducer",

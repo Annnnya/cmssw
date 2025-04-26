@@ -11,14 +11,14 @@ runs=6  # 5 actual runs + 1 warmup run
 thread_stream_combos=("4:4" "8:4" "8:8" "16:8" "16:16" "32:32" "64:64" "128:128" "256:256")
 
 # NUMA configurations: format "local_node:remote_node"
-numa_pairs=("6:7")
+numa_pairs=("6:6" "6:7" "4,5:6,7")
 
 # Corrected variable assignments (no spaces around =)
-local_script_name="dummy_local_3send.py"
-remote_script_name="dummy_remote_3rec.py"
+local_script_name="dummy_local_1send.py"
+remote_script_name="dummy_remote_1rec.py"
 
 # Base directory for logs
-BASE_DIR="../../test_results/mpi_async_dummy-3-3"
+BASE_DIR="../../test_results/general_dummy_1-1"
 mkdir -p "$BASE_DIR"
 
 for comm in "${comm_types[@]}"; do
@@ -42,7 +42,6 @@ for comm in "${comm_types[@]}"; do
                 export EXPERIMENT_STREAMS=$streams
                 export EXPERIMENT_NAME="comm_${comm}_t${threads}s${streams}_n${local_numa}-${remote_numa}_r${i}"
                 export EXPERIMENT_OUTPUT_DIR="$TEST_DIR"
-                export THROUGHPUT_LOG_FILE="${BASE_DIR}/throughputs.txt"
 
                 # Set OpenMPI parameters
                 case "$comm" in

@@ -25,8 +25,7 @@ mpirun --mca pml ob1 --mca btl vader,tcp,self \
   -np 1 numactl -N 7 env EXPERIMENT_THREADS=8 EXPERIMENT_STREAMS=8 cmsRun dummy_remote_1rec.py : \
   -np 1 numactl -N 6 env EXPERIMENT_THREADS=8 EXPERIMENT_STREAMS=8 cmsRun dummy_local_1send.py
 ```
-mpirun -np 1 numactl -N 7 env EXPERIMENT_THREADS=8 EXPERIMENT_STREAMS=8 cmsRun dummy_remote_1rec.py : \
-  -np 1 numactl -N 6 env EXPERIMENT_THREADS=8 EXPERIMENT_STREAMS=8 cmsRun dummy_local_1send.py
+
 ---
 
 ## Running Experiments via PMIx Server (multi-node or custom networking)
@@ -59,8 +58,8 @@ mpirun --mca pmix_server_uri file:server.uri -n 1 -bind-to none \
 cd $CMSSW_BASE/src/HeterogeneousCore/MPICore/test/test_scripts_and_configs/real/
 
 mpirun --mca pml ob1 --mca btl vader,tcp,self \
-  -np 1 numactl -N 6 cmsRun hlt_remote.py : \
-  -np 1 numactl -N 6 cmsRun hlt_local.py
+  -np 1 numactl -N 6 env EXPERIMENT_THREADS=4 EXPERIMENT_STREAMS=4 cmsRun hlt_remote.py : \
+  -np 1 numactl -N 6 env EXPERIMENT_THREADS=4 EXPERIMENT_STREAMS=4  cmsRun hlt_local.py
 ```
 
 ### Useful Flags
