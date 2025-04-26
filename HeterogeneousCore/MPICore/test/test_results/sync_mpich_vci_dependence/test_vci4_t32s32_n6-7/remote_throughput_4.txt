@@ -1,0 +1,1 @@
+[THROUGHPUT] vci4_t32s32_n6-7_r4 | avg: 59.3481 ± 69.6615 ev/s
