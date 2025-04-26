@@ -230,6 +230,7 @@ void MPIController::produce(edm::Event& event, edm::EventSetup const& setup) {
     ptr->reset();
     delete ptr;
   });
+  link->allocateWindow();
   event.emplace(token_, std::move(link));
 }
 

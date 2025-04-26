@@ -24,7 +24,7 @@ struct OffsetSizePair{
 class MPIChannel {
 public:
   MPIChannel() = default;
-  MPIChannel(MPI_Comm comm, int destination) : comm_(comm), dest_(destination), currentOffset_(0) { allocateWindow(); }
+  MPIChannel(MPI_Comm comm, int destination) : comm_(comm), dest_(destination), currentOffset_(0) {}
   ~MPIChannel(){ freeWindow(); }
   MPIChannel& operator=(const MPIChannel& other) {
     if (this != &other) {
@@ -132,7 +132,7 @@ public:
     }
   }
   
-
+  void allocateWindow(); // allocate memory and attach to window
   std::vector<OffsetSizePair> receiveRegions(int instance);
   void sendRegions(int instance, std::vector<OffsetSizePair>& putRegions);
 
@@ -272,7 +272,6 @@ private:
     size_t& regionIndex
   );
 
-  void allocateWindow(); // allocate memory and attach to window
   void freeWindow();     // cleanup
 
   // MPI intercommunicator

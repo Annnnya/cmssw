@@ -394,9 +394,11 @@ void MPIChannel::readSerializedProductFromWindow_(
 
 
 void MPIChannel::allocateWindow() {
+  std::cerr << "allocating window" << std::endl;
   windowBuffer_.resize(windowSize_);
   MPI_Win_create(windowBuffer_.data(), windowSize_, 1, MPI_INFO_NULL, comm_, &window_);
   MPI_Win_fence(0, window_);
+  std::cerr << "finished allocating window" << std::endl;
 }
 
 void MPIChannel::freeWindow() {
