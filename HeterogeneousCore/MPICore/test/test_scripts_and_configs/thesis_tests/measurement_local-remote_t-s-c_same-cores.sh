@@ -4,7 +4,7 @@
 runs=6
 
 # Threads/Streams combinations to test
-thread_stream_combos=("32:32")
+thread_stream_combos=("1:1" "4:4" "8:8" "16:16" "24:24" "32:32")
 
 # Script to run
 script_local="hlt_local.py"
@@ -34,7 +34,7 @@ for combo in "${thread_stream_combos[@]}"; do
         export THROUGHPUT_LOG_FILE="$BASE_DIR/throughputs.txt"
 
         # Run pinned to the CPU list
-        /nfshome0/apolova/mpich-4.3.0-install/bin/mpirun -np 1 env MPIR_CVAR_CH4_DEVICE=ch4:ucx UCX_TLS=xpmem,self,shm numactl --physcpubind=0-4 cmsRun "$script_remote" \
+        /nfshome0/apolova/mpich-4.3.0-install/bin/mpirun -np 1 env MPIR_CVAR_CH4_DEVICE=ch4:ucx UCX_TLS=xpmem,self,shm numactl --physcpubind=0-"${end_core}" cmsRun "$script_remote" \
               : -np 1 env MPIR_CVAR_CH4_DEVICE=ch4:ucx UCX_TLS=xpmem,self,shm numactl --physcpubind=0-"${end_core}" cmsRun "$script_local"
     done
 
