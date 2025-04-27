@@ -5,14 +5,14 @@ import os
 # ==== INPUT FILES ====
 
 files = [
-    {"one machine, different sockets": "/data/user/apolova/dev2/CMSSW_15_0_0/src/HeterogeneousCore/MPICore/test/test_results_thesis/simple_async/local-remote_t-s-c_different-sockets/local_summary_table.csv"},
-    {"one machine, defferent sockets with remote fixed at 4 cores": "/data/user/apolova/dev2/CMSSW_15_0_0/src/HeterogeneousCore/MPICore/test/test_results_thesis/simple_async/local-remote_t-s-c_remote_oversub/remote_4/local_summary_table.csv"},
-    {"local and remote on same cores": "/data/user/apolova/dev2/CMSSW_15_0_0/src/HeterogeneousCore/MPICore/test/test_results_thesis/simple_async/local-remote_t-s-c_same_cores/local_summary_table.csv"},
+    {"one machine, different sockets": "/data/user/apolova/dev2/CMSSW_15_0_0/src/HeterogeneousCore/MPICore/test/test_results_thesis/one-sided/local-remote_t-s-c_different-sockets/local_summary_table.csv"},
+    {"one machine, defferent sockets with remote fixed at 4 cores": "/data/user/apolova/dev2/CMSSW_15_0_0/src/HeterogeneousCore/MPICore/test/test_results_thesis/one-sided/local-remote_t-s-c_remote_oversub/remote_4/local_summary_table.csv"},
+    {"local and remote on same cores": "/data/user/apolova/dev2/CMSSW_15_0_0/src/HeterogeneousCore/MPICore/test/test_results_thesis/one-sided/local-remote_t-s-c_same_cores/local_summary_table.csv"},
     {"whole pipeline without split": "/data/user/apolova/dev2/CMSSW_15_0_0/src/HeterogeneousCore/MPICore/test/test_results_thesis/whole_hlt_t-s-c/whole_summary_table.csv"},
-    {"milan-genoa over IB": "/data/user/apolova/dev2/CMSSW_15_0_0/src/HeterogeneousCore/MPICore/test/test_results_thesis/simple_async/milan-genoa_ucx_t-s-c/local_summary_table.csv"}
+    # {"milan-genoa over IB": "/data/user/apolova/dev2/CMSSW_15_0_0/src/HeterogeneousCore/MPICore/test/test_results_thesis/simple_async/milan-genoa_ucx_t-s-c/local_summary_table.csv"}
 ]
 
-output_dir = "./comparative_plots_simple_async"
+output_dir = "./comparative_plots_one-sided"
 
 # ==== READ & PREPARE DATA ====
 
