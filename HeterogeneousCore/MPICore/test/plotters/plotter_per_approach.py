@@ -5,11 +5,11 @@ import os
 # ==== INPUT FILES ====
 
 files = [
-    {"one machine, different sockets": "/data/user/apolova/dev1/CMSSW_15_0_0/src/HeterogeneousCore/MPICore/test/test_results_thesis/local-remote_t-s-c_different-sockets/remote_summary_table.csv"},
-    {"one machine, defferent sockets with remote fixed at 4 cores": "/data/user/apolova/dev2/CMSSW_15_0_0/src/HeterogeneousCore/MPICore/test/test_results_thesis/local-remote_t-s-c_remote_oversub/remote_4/local_summary_table.csv"},
-    {"local and remote on same cores": "/data/user/apolova/dev2/CMSSW_15_0_0/src/HeterogeneousCore/MPICore/test/test_results_thesis/local-remote_t-s-c_same_cores/local_summary_table.csv"},
-    # {"whole pipeline without split": "/data/user/apolova/dev2/CMSSW_15_0_0/src/HeterogeneousCore/MPICore/test/test_results_thesis/whole_hlt_t-s-c/whole_summary_table.csv"},
-    {"milan-genoa over IB": "/data/user/apolova/dev2/CMSSW_15_0_0/src/HeterogeneousCore/MPICore/test/test_results_thesis/milan-genoa_ucx_t-s-c/local_summary_table.csv"}
+    {"sync": "/data/user/apolova/dev1/CMSSW_15_0_0/src/HeterogeneousCore/MPICore/test/test_results_thesis/local-remote_t-s-c_different-sockets/local_summary_table.csv"},
+    {"async": "/data/user/apolova/dev1/CMSSW_15_0_0/src/HeterogeneousCore/MPICore/test/test_results_thesis/simple_async/local-remote_t-s-c_different-sockets/local_summary_table.csv"},
+    {"one-sided": "/data/user/apolova/dev1/CMSSW_15_0_0/src/HeterogeneousCore/MPICore/test/test_results_thesis/one-sided/local-remote_t-s-c_different-sockets/local_summary_table.csv"},
+    # {"whole": "/data/user/apolova/dev1/CMSSW_15_0_0/src/HeterogeneousCore/MPICore/test/test_results_thesis/whole_hlt_t-s-c/whole_summary_table.csv"},
+
 ]
 
 output_dir = "./comparative_plots_diff_approaches_diff_sockets"
@@ -64,9 +64,9 @@ def make_plot(y_column, ylabel, title, filename, max_threads=None):
 
 # ==== MAKE PLOTS ====
 
-make_plot("throughput_ev_per_s", "Throughput (ev/s)", "Throughput vs Threads", "throughput_vs_threads.png", max_threads=64)
-make_plot("total_real", "Total Real Time per Event", "Total Real Time per Event vs Threads", "total_real_vs_threads.png", max_threads=64)
-make_plot("total_cpu", "Total CPU Time per Event", "Total CPU Time per Event vs Threads", "total_cpu_vs_threads.png", max_threads=64)
+# make_plot("throughput_ev_per_s", "Throughput (ev/s)", "Throughput vs Threads", "throughput_vs_threads.png", max_threads=64)
+# make_plot("total_real", "Total Real Time per Event", "Total Real Time per Event vs Threads", "total_real_vs_threads.png", max_threads=64)
+# make_plot("total_cpu", "Total CPU Time per Event", "Total CPU Time per Event vs Threads", "total_cpu_vs_threads.png", max_threads=64)
 make_plot("recv_real", "Total real time spent inside receiver modules", "Total time spent receiving vs Threads", "avg_receive_real.png", max_threads=64)
 make_plot("send_real", "Total real time spent inside sender modules", "Total time spent sending vs Threads", "avg_send_real.png", max_threads=64)
 

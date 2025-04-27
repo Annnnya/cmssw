@@ -1,0 +1,8 @@
+[THROUGHPUT] xpmem_t32s32_r1 | avg: 136.42 ± 19.2404 ev/s
+[THROUGHPUT] xpmem_t32s32_r1 | avg: 133.209 ± 19.8024 ev/s
+[THROUGHPUT] xpmem_t32s32_r2 | avg: 133.184 ± 20.3616 ev/s
+[THROUGHPUT] xpmem_t32s32_r2 | avg: 131.381 ± 22.3601 ev/s
+[THROUGHPUT] xpmem_t32s32_r3 | avg: 132.529 ± 8.97757 ev/s
+[THROUGHPUT] xpmem_t32s32_r3 | avg: 130.008 ± 16.2289 ev/s
+[THROUGHPUT] xpmem_t32s32_r6 | avg: 123.539 ± 10.7083 ev/s
+[THROUGHPUT] xpmem_t32s32_r6 | avg: 121.373 ± 15.2858 ev/s
