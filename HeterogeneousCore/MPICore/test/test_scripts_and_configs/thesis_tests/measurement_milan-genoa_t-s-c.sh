@@ -13,7 +13,7 @@ script_local="hlt_local.py"
 script_remote="hlt_remote.py"
 
 # Base directory for logs
-BASE_DIR="../../test_results_thesis/mpich/sync/milan-genoa_ucx_t-s-c"
+BASE_DIR="../../test_results_thesis/mpich/simple_async/milan-genoa_ucx_t-s-c"
 mkdir -p "$BASE_DIR"
 
 # Hostnames

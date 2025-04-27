@@ -9,7 +9,8 @@ files = [
     {"async": "/data/user/apolova/dev1/CMSSW_15_0_0/src/HeterogeneousCore/MPICore/test/test_results_thesis/simple_async/milan-genoa_ucx_t-s-c/local_summary_table.csv"},
     {"one-sided": "/data/user/apolova/dev1/CMSSW_15_0_0/src/HeterogeneousCore/MPICore/test/test_results_thesis/one-sided/milan-genoa_ucx_t-s-c/local_summary_table.csv"},
     {"whole": "/data/user/apolova/dev1/CMSSW_15_0_0/src/HeterogeneousCore/MPICore/test/test_results_thesis/whole_hlt_t-s-c/whole_summary_table.csv"},
-    {"synchronous mpich": "/data/user/apolova/dev1/CMSSW_15_0_0/src/HeterogeneousCore/MPICore/test/test_results_thesis/mpich/sync/milan-genoa_ucx_t-s-c/local_summary_table.csv"}
+    {"synchronous mpich": "/data/user/apolova/dev1/CMSSW_15_0_0/src/HeterogeneousCore/MPICore/test/test_results_thesis/mpich/sync/milan-genoa_ucx_t-s-c/local_summary_table.csv"},
+    {"simple asynchronous mpich": "/data/user/apolova/dev1/CMSSW_15_0_0/src/HeterogeneousCore/MPICore/test/test_results_thesis/mpich/simple_async/milan-genoa_ucx_t-s-c/local_summary_table.csv"}
 ]
 
 output_dir = "./milan-genoa-comparative_plots_diff_approaches"
