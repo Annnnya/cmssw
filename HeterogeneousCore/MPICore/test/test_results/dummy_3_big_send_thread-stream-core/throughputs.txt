@@ -1,0 +1,12 @@
+[THROUGHPUT] comm_xpmem_t1s1_r1 | avg: 761.451 ± 12.2346 ev/s
+[THROUGHPUT] comm_xpmem_t1s1_r1 | avg: 761.457 ± 12.2204 ev/s
+[THROUGHPUT] comm_xpmem_t1s1_r2 | avg: 725.753 ± 30.6182 ev/s
+[THROUGHPUT] comm_xpmem_t1s1_r2 | avg: 725.761 ± 30.6178 ev/s
+[THROUGHPUT] comm_xpmem_t1s1_r3 | avg: 735.561 ± 28.534 ev/s
+[THROUGHPUT] comm_xpmem_t1s1_r3 | avg: 735.568 ± 28.5284 ev/s
+[THROUGHPUT] comm_xpmem_t1s1_r4 | avg: 758.858 ± 21.9431 ev/s
+[THROUGHPUT] comm_xpmem_t1s1_r4 | avg: 758.863 ± 21.9474 ev/s
+[THROUGHPUT] comm_xpmem_t1s1_r5 | avg: 791.507 ± 50.4178 ev/s
+[THROUGHPUT] comm_xpmem_t1s1_r5 | avg: 791.513 ± 50.4201 ev/s
+[THROUGHPUT] comm_xpmem_t1s1_r6 | avg: 728.119 ± 38.7059 ev/s
+[THROUGHPUT] comm_xpmem_t1s1_r6 | avg: 728.125 ± 38.7083 ev/s
