@@ -1,45 +1,45 @@
-# plot_dummy_results.py
-
 import pandas as pd
 import matplotlib.pyplot as plt
-import os
 
-experiment_name = "synchronous_thread-stream-core"
-mode = "local"
+# === CONFIGURATION ===
 
-df = pd.read_csv(f"../{experiment_name}/{mode}_summary_table.csv")
+# Path to your summary CSV file
+summary_file = "/data/user/apolova/dev1/CMSSW_15_0_0/src/HeterogeneousCore/MPICore/test/test_results_thesis/dummy/mpich/simple_async/different_sockets/local_summary_table.csv"  # Change to your real file path
 
-# Make nicer labels
-df["config"] = df["threads"].astype(str) + "x" + df["streams"].astype(str)
-df["numa"] = df["local_numa"].astype(str) + "-" + df["remote_numa"].astype(str)
+# === LOAD DATA ===
 
-# Metrics to plot
-time_metrics = {
-    "recv_cpu": "Receiver CPU Time / event",
-    "recv_real": "Receiver Real Time / event",
-    "total_cpu": "Total CPU Time / event",
-    "total_real": "Total Real Time / event"
-}
+df = pd.read_csv(summary_file)
 
-# Output folder
-plot_dir = f"../{experiment_name}/plots_{mode}"
-os.makedirs(plot_dir, exist_ok=True)
+# === HELPERS ===
 
-# Loop over comm types and plot one plot per metric
-for comm_type in df["comm"].unique():
-    df_comm = df[df["comm"] == comm_type]
-    for metric, label in time_metrics.items():
-        plt.figure(figsize=(10, 6))
-        for numa, group in df_comm.groupby("numa"):
-            group_sorted = group.sort_values(by=["threads", "streams"])
-            plt.plot(group_sorted["config"], group_sorted[metric], label=f"NUMA {numa}", marker='o')
-        plt.title(f"{label} vs Threads x Streams [{comm_type}]")
-        plt.xlabel("Threads x Streams")
-        plt.ylabel(label)
-        plt.legend()
-        plt.grid(True)
-        plt.tight_layout()
-        plt.savefig(os.path.join(plot_dir, f"{comm_type}_{metric}.png"))
-        plt.close()
+# Helper to format message size nicely
+def format_size(bytes_val):
+    if bytes_val >= 1024 * 1024:
+        return f"{bytes_val // (1024 * 1024)} MB"
+    elif bytes_val >= 1024:
+        return f"{bytes_val // 1024} KB"
+    else:
+        return f"{bytes_val} B"
 
-print(f"Saved plots to {plot_dir}")
+# === PLOT ===
+
+plt.figure(figsize=(10, 6))
+
+# Group by message size
+for message_size, group in df.groupby("message_size_bytes"):
+    group_sorted = group.sort_values("threads")  # make sure it's ordered
+    plt.plot(
+        group_sorted["threads"],
+        group_sorted["throughput_ev_per_s"],
+        marker="o",
+        label=f"{format_size(message_size)}"
+    )
+
+plt.title("Throughput Scaling with Number of Threads (per Message Size)")
+plt.xlabel("Number of Threads")
+plt.ylabel("Throughput (events/s)")
+plt.grid(True)
+plt.legend(title="Message Size", loc="best")
+plt.tight_layout()
+
+plt.savefig("dummy_scaling")

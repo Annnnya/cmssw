@@ -13,6 +13,7 @@ process.options.numberOfStreams = int(os.environ.get("EXPERIMENT_STREAMS", 2))
 process.options.numberOfConcurrentLuminosityBlocks = 1
 process.options.wantSummary = False
 
+# messageSize = cms.uint32(int(os.environ.get("MESSAGE_SIZE", 1024)))
 # Logging
 process.MessageLogger = cms.Service("MessageLogger",
     cerr=cms.untracked.PSet(enableStatistics=cms.untracked.bool(False)),
@@ -76,15 +77,15 @@ process.mpiController.run_local = cms.untracked.bool(True)
 
 # Dummy producer
 process.dummyProducer1 = cms.EDProducer("DummyProducer",
-    sizeInBytes=cms.uint32(1024)
+    sizeInBytes=cms.uint32(int(os.environ.get("MESSAGE_SIZE", 1024)))
 )
 
 process.dummyProducer2 = cms.EDProducer("DummyProducer",
-    sizeInBytes=cms.uint32(1024)
+    sizeInBytes=cms.uint32(int(os.environ.get("MESSAGE_SIZE", 1024)))
 )
 
 process.dummyProducer3 = cms.EDProducer("DummyProducer",
-    sizeInBytes=cms.uint32(1024)
+    sizeInBytes=cms.uint32(int(os.environ.get("MESSAGE_SIZE", 1024)))
 )
 
 # MPI sender

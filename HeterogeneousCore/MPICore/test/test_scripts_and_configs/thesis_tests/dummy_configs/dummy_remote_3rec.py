@@ -1,22 +1,26 @@
 import FWCore.ParameterSet.Config as cms
 import os
 
-process = cms.Process("DUMMYLOCAL")
+process = cms.Process("DUMMYREMOTE")
 
-# Event source: Empty
-process.source = cms.Source("EmptySource")
-process.maxEvents = cms.untracked.PSet(input=cms.untracked.int32(10000))
+# Source: receive from MPI
+process.source = cms.Source("MPISource",
+    run_local=cms.untracked.bool(True),
+    firstRun=cms.untracked.uint32(1)
+)
+process.maxEvents = cms.untracked.PSet(input=cms.untracked.int32(-1))
 
-# Concurrency settings (optional, can use env)
+# Concurrency
 process.options.numberOfThreads = int(os.environ.get("EXPERIMENT_THREADS", 2))
 process.options.numberOfStreams = int(os.environ.get("EXPERIMENT_STREAMS", 2))
 process.options.numberOfConcurrentLuminosityBlocks = 1
 process.options.wantSummary = False
 
+
 # Logging
 process.MessageLogger = cms.Service("MessageLogger",
     cerr=cms.untracked.PSet(enableStatistics=cms.untracked.bool(False)),
-    MPISender=cms.untracked.PSet()
+    MPIReceiver=cms.untracked.PSet()
 )
 
 # FastTimer output
@@ -63,58 +67,49 @@ process.ThroughputService = cms.Service( "ThroughputService",
 )
 
 process.FastTimerService.writeJSONSummary = True
-process.FastTimerService.jsonFileName=cms.untracked.string(f"{output_dir}/local_{experiment_name}.json")
+process.FastTimerService.jsonFileName=cms.untracked.string(f"{output_dir}/remote_{experiment_name}.json")
 
 # MPI service
 process.load("HeterogeneousCore.MPIServices.MPIService_cfi")
 process.MPIService.pmix_server_uri = "file:server.uri"
 
-# Controller
-from HeterogeneousCore.MPICore.mpiController_cfi import mpiController as mpiController_
-process.mpiController = mpiController_.clone()
-process.mpiController.run_local = cms.untracked.bool(True)
-
-# Dummy producer
-process.dummyProducer1 = cms.EDProducer("DummyProducer",
-    sizeInBytes=cms.uint32(1024)
-)
-
-process.dummyProducer2 = cms.EDProducer("DummyProducer",
-    sizeInBytes=cms.uint32(1024)
-)
-
-process.dummyProducer3 = cms.EDProducer("DummyProducer",
-    sizeInBytes=cms.uint32(1024)
-)
-
-# MPI sender
-process.mpiSender1 = cms.EDProducer("MPISender",
-    upstream=cms.InputTag("mpiController"),
+# Receiver
+process.remoteDummyReceiver1 = cms.EDProducer("MPIReceiver",
+    upstream=cms.InputTag("source"),
     instance=cms.int32(1),
-    products=cms.vstring("*_dummyProducer1__*")
+    products=cms.VPSet(
+        cms.PSet(
+            type=cms.string("edm::FixedSizeDummy"),
+            label=cms.string("")
+        )
+    )
 )
 
-process.mpiSender2 = cms.EDProducer("MPISender",
-    upstream=cms.InputTag("mpiController"),
+process.remoteDummyReceiver2 = cms.EDProducer("MPIReceiver",
+    upstream=cms.InputTag("source"),
     instance=cms.int32(2),
-    products=cms.vstring("*_dummyProducer2__*")
+    products=cms.VPSet(
+        cms.PSet(
+            type=cms.string("edm::FixedSizeDummy"),
+            label=cms.string("")
+        )
+    )
 )
 
-process.mpiSender3 = cms.EDProducer("MPISender",
-    upstream=cms.InputTag("mpiController"),
+process.remoteDummyReceiver3 = cms.EDProducer("MPIReceiver",
+    upstream=cms.InputTag("source"),
     instance=cms.int32(3),
-    products=cms.vstring("*_dummyProducer3__*")
+    products=cms.VPSet(
+        cms.PSet(
+            type=cms.string("edm::FixedSizeDummy"),
+            label=cms.string("")
+        )
+    )
 )
 
 # Path
-process.dummyPath = cms.Path(
-    process.mpiController +
-    process.dummyProducer1 +
-    process.dummyProducer2 +
-    process.dummyProducer3 +
-    process.mpiSender1 +
-    process.mpiSender2 +
-    process.mpiSender3
-)
-
-process.schedule = cms.Schedule(process.dummyPath)
+process.remotePath = cms.Path(
+    process.remoteDummyReceiver1 +
+    process.remoteDummyReceiver2 +
+    process.remoteDummyReceiver3)
+process.schedule = cms.Schedule(process.remotePath)

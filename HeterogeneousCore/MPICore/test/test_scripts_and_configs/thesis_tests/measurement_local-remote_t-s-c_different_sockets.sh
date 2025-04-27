@@ -7,7 +7,7 @@ runs=6
 thread_stream_combos=("1:1" "4:4" "8:8" "16:16" "24:24" "32:32")
 
 # Script to run
-script_local="hlt_local.py"
+script_local="../dummy/dummy_local_3send.py"
 script_remote="hlt_remote.py"
 
 # Base directory for logs
