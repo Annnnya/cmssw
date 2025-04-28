@@ -14,7 +14,7 @@ script_local="dummy_configs/dummy_local_3send.py"
 script_remote="dummy_configs/dummy_remote_3rec.py"
 
 # Base directory for logs
-BASE_DIR="../../test_results_thesis/dummy/mpich/simple_async/different_sockets"
+BASE_DIR="../../test_results_thesis/dummy/mpich/simple_async_vci/different_sockets"
 mkdir -p "$BASE_DIR"
 
 for message_size in "${message_sizes[@]}"; do
@@ -41,8 +41,21 @@ for message_size in "${message_sizes[@]}"; do
             export THROUGHPUT_LOG_FILE="$BASE_DIR/throughputs.txt"
 
             # Run pinned to the CPU list
-            /nfshome0/apolova/mpich-4.3.0-install/bin/mpirun -np 1 env MPIR_CVAR_CH4_DEVICE=ch4:ucx UCX_TLS=xpmem,self,shm numactl --physcpubind=64-"${end_core_other}" cmsRun "$script_remote" \
-                  : -np 1 env MPIR_CVAR_CH4_DEVICE=ch4:ucx UCX_TLS=xpmem,self,shm numactl --physcpubind=0-"${end_core}" cmsRun "$script_local"
+            /nfshome0/apolova/mpich-4.3.0-install/bin/mpirun -np 1 env \
+                MPIR_CVAR_CH4_DEVICE=ch4:ucx \
+                UCX_TLS=xpmem,self,shm \
+                MPIR_CVAR_CH4_NUM_VCIS=$threads \
+                MPIR_CVAR_CH4_UCX_USE_MULTIPLE_EP=1 \
+                MPIR_CVAR_CH4_VCI_METHOD=per_vci \
+                numactl --physcpubind=64-"${end_core_other}" cmsRun "$script_remote" \
+                : -np 1 env \
+                MPIR_CVAR_CH4_DEVICE=ch4:ucx \
+                UCX_TLS=xpmem,self,shm \
+                MPIR_CVAR_CH4_NUM_VCIS=$threads \
+                MPIR_CVAR_CH4_UCX_USE_MULTIPLE_EP=1 \
+                MPIR_CVAR_CH4_VCI_METHOD=per_vci \
+                numactl --physcpubind=0-"${end_core}" cmsRun "$script_local"
+
         done
 
         echo "Completed tests for threads=$threads, streams=$streams, message size=$message_size bytes"
