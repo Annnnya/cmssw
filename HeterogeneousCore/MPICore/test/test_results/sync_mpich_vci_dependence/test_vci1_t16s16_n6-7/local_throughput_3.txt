@@ -1,0 +1,1 @@
+[THROUGHPUT] vci1_t16s16_n6-7_r3 | avg: 57.2876 ± 100.716 ev/s

@@ -1,0 +1,1 @@
+[THROUGHPUT] vci1_t256s256_n6-7_r2 | avg: 43.9873 ± 74.1387 ev/s
