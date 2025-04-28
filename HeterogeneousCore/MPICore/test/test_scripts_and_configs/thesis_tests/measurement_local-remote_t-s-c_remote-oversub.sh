@@ -11,7 +11,7 @@ script_local="hlt_local.py"
 script_remote="hlt_remote.py"
 
 # Base directory for logs
-BASE_DIR="../../test_results_thesis/local-remote_t-s-c_remote_oversub/remote_4"
+BASE_DIR="../../test_results_thesis/mpich/simple_async/local-remote_t-s-c_remote_oversub/remote_4"
 mkdir -p "$BASE_DIR"
 
 
@@ -34,13 +34,13 @@ for combo in "${thread_stream_combos[@]}"; do
         export EXPERIMENT_NAME="xpmem_t${threads}s${streams}_r${i}"
         export EXPERIMENT_OUTPUT_DIR="$TEST_DIR"
         export THROUGHPUT_LOG_FILE="$BASE_DIR/throughputs.txt"
-        export OMPI_MCA_pml=ob1
-        export OMPI_MCA_btl_vader_single_copy_mechanism=xpmem
-        export OMPI_MCA_btl=self,vader
+        # export OMPI_MCA_pml=ob1
+        # export OMPI_MCA_btl_vader_single_copy_mechanism=xpmem
+        # export OMPI_MCA_btl=self,vader
 
         # Run pinned to the CPU list
-        mpirun -np 1 -bind-to none numactl --physcpubind=64-67 cmsRun "$script_remote" \
-                : -np 1 -bind-to none numactl --physcpubind=0-"${end_core}" cmsRun "$script_local"
+        /nfshome0/apolova/mpich-4.3.0-install/bin/mpirun -np 1 env MPIR_CVAR_CH4_DEVICE=ch4:ucx UCX_TLS=xpmem,self,shm numactl --physcpubind=64-67 cmsRun "$script_remote" \
+              : -np 1 env MPIR_CVAR_CH4_DEVICE=ch4:ucx UCX_TLS=xpmem,self,shm numactl --physcpubind=0-"${end_core}" cmsRun "$script_local"
     done
 
     echo "Completed tests for threads=$threads, streams=$streams"

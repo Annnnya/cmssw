@@ -5,13 +5,15 @@ runs=6
 
 # Threads/Streams combinations to test
 thread_stream_combos=("1:1" "4:4" "8:8" "16:16" "24:24" "32:32")
+# thread_stream_combos=("1:1")
+
 
 # Scripts to run
 script_local="hlt_local.py"
 script_remote="hlt_remote.py"
 
 # Base directory for logs
-BASE_DIR="../../test_results_thesis/milan-genoa_ucx_t-s-c"
+BASE_DIR="../../test_results_thesis/mpich/simple_async/milan-genoa_ucx_t-s-c"
 mkdir -p "$BASE_DIR"
 
 # Hostnames
@@ -19,13 +21,14 @@ remote_host="gputest-genoa-02.cms"
 local_host="gputest-milan-02.cms"
 
 # Interfaces and UCX devices
-remote_iface="enp34s0f0"
-local_iface="eno8303"
-remote_ucx_dev="mlx5_4"
-local_ucx_dev="mlx5_3"
+remote_ucx_dev="mlx5_4:1"
+local_ucx_dev="mlx5_3:1"
 
-# Resolve absolute base dir (safe for remote mkdir)
+# Resolve absolute base dir
 absolute_base_dir=$(realpath "$BASE_DIR")
+
+# Path to MPICH mpirun
+MPIRUN=/nfshome0/apolova/mpich-4.3.0-install/bin/mpirun
 
 for combo in "${thread_stream_combos[@]}"; do
     IFS=':' read -r threads streams <<< "$combo"
@@ -46,7 +49,6 @@ for combo in "${thread_stream_combos[@]}"; do
     for i in $(seq 1 $runs); do
         echo "Run #$i for t${threads}s${streams} on CPU list: 0-$end_core"
 
-        # Define environment variables for this run
         run_id=$i
         exp_threads=$threads
         exp_streams=$streams
@@ -55,36 +57,31 @@ for combo in "${thread_stream_combos[@]}"; do
         throughput_log_file="$absolute_base_dir/throughputs.txt"
 
         # Launch processes
-        cmsenv_mpirun \
-            -mca orte_base_help_aggregate 0 \
-            -mca pml ucx \
-            -mca btl ^openib \
-            -H $remote_host \
+        $MPIRUN \
+            -hosts "$remote_host","$local_host" \
             -np 1 \
-            -x LD_LIBRARY_PATH \
-            -x OMPI_MCA_ucx_net_devices=$remote_ucx_dev \
-            -x RUN_ID=$run_id \
-            -x EXPERIMENT_THREADS=$exp_threads \
-            -x EXPERIMENT_STREAMS=$exp_streams \
-            -x EXPERIMENT_NAME=$exp_name \
-            -x EXPERIMENT_OUTPUT_DIR=$exp_output_dir \
-            -x THROUGHPUT_LOG_FILE=$throughput_log_file \
-            -bind-to none numactl \
-            --physcpubind=0-"${end_core}" \
-            cmsRun "$script_remote" \
+            -env UCX_TLS rc_x,ud_x,self,shm \
+            -env LD_LIBRARY_PATH "$LD_LIBRARY_PATH" \
+            -env UCX_NET_DEVICES "$remote_ucx_dev" \
+            -env RUN_ID "$run_id" \
+            -env EXPERIMENT_THREADS "$exp_threads" \
+            -env EXPERIMENT_STREAMS "$exp_streams" \
+            -env EXPERIMENT_NAME "$exp_name" \
+            -env EXPERIMENT_OUTPUT_DIR "$exp_output_dir" \
+            -env THROUGHPUT_LOG_FILE "$throughput_log_file" \
+            numactl --physcpubind=0-"${end_core}" cmsRun "$script_remote" \
             : \
-            -H $local_host \
             -np 1 \
-            -x OMPI_MCA_ucx_net_devices=$local_ucx_dev \
-            -x RUN_ID=$run_id \
-            -x EXPERIMENT_THREADS=$exp_threads \
-            -x EXPERIMENT_STREAMS=$exp_streams \
-            -x EXPERIMENT_NAME=$exp_name \
-            -x EXPERIMENT_OUTPUT_DIR=$exp_output_dir \
-            -x THROUGHPUT_LOG_FILE=$throughput_log_file \
-            -bind-to none numactl \
-            --physcpubind=0-"${end_core}" \
-            cmsRun "$script_local"
+            -env UCX_TLS rc_x,ud_x,self,shm \
+            -env LD_LIBRARY_PATH "$LD_LIBRARY_PATH" \
+            -env UCX_NET_DEVICES "$local_ucx_dev" \
+            -env RUN_ID "$run_id" \
+            -env EXPERIMENT_THREADS "$exp_threads" \
+            -env EXPERIMENT_STREAMS "$exp_streams" \
+            -env EXPERIMENT_NAME "$exp_name" \
+            -env EXPERIMENT_OUTPUT_DIR "$exp_output_dir" \
+            -env THROUGHPUT_LOG_FILE "$throughput_log_file" \
+            numactl --physcpubind=0-"${end_core}" cmsRun "$script_local"
 
     done
 
