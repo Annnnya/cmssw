@@ -158,17 +158,17 @@ MPI_Status MPIChannel::receiveEventAuxiliary_(edm::EventAuxiliary& aux, MPI_Mess
   return status;
 }
 
-// serialize an object of generic type using its ROOT dictionary, and send the binary blob
+// serialize an object of generic type using its ROOT dictionary, and send the binary blob (overloaded for async with issend)
 void MPIChannel::sendSerializedProduct_(int instance, TClass const* type, void const* product, MPIAsyncKeeper& async_keeper) {
   std::shared_ptr<TBufferFile> buffer = std::make_shared<TBufferFile>(TBuffer::kWrite);
   type->Streamer(const_cast<void*>(product), *buffer);
   int tag = EDM_MPI_SendSerializedProduct | instance * EDM_MPI_MessageTagWidth_;
-  // std::cerr << "message size " <<  buffer->Length() << std::endl;
   async_keeper.requests.emplace_back();
   MPI_Issend(buffer->Buffer(), buffer->Length(), MPI_BYTE, dest_, tag, comm_, &async_keeper.requests.back());
   async_keeper.buffers_to_keep_alive.push_back(buffer);
 }
 
+// serialize an object of generic type using its ROOT dictionary, and send the binary blob
 void MPIChannel::sendSerializedProduct_(int instance, TClass const* type, void const* product) {
   TBufferFile buffer{TBuffer::kWrite};
   type->Streamer(const_cast<void*>(product), buffer);
@@ -227,6 +227,7 @@ void MPIChannel::sendTrivialCopyProduct_(int instance, edm::WrapperBase const* w
   }
 }
 
+// send a wrapped object using its TrivialCopyTraits
 void MPIChannel::sendTrivialCopyProduct_(int instance, edm::WrapperBase const* wrapper) {
   int tag = EDM_MPI_SendTrivialCopyProduct | instance * EDM_MPI_MessageTagWidth_;
 
@@ -238,7 +239,6 @@ void MPIChannel::sendTrivialCopyProduct_(int instance, edm::WrapperBase const* w
 
   // transfer the memory regions
   auto regions = wrapper->trivialCopyRegions();
-  // TODO send the number of regions ?
   for (size_t i = 0; i < regions.size(); ++i) {
     assert(regions[i].data() != nullptr);
     MPI_Send(regions[i].data(), regions[i].size_bytes(), MPI_BYTE, dest_, tag, comm_);

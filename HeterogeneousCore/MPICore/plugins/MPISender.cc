@@ -114,22 +114,13 @@ public:
     }
   
     edm::Service<edm::Async> as;
+    // asynchronously wait for mpi requests of this module to finish
     as->runAsync(
         std::move(holder),
         [this, async_keeper = std::move(async_keeper)]() mutable {
-          // auto start = std::chrono::steady_clock::now();
           for (MPI_Request& req : async_keeper.requests) {
             MPI_Wait(&req, MPI_STATUS_IGNORE);
           }
-          // auto end = std::chrono::steady_clock::now();
-          // auto duration_us = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
-          // std::string s = std::to_string(duration_us);
-          // int fd = open(this->time_filename_.c_str(), O_WRONLY | O_CREAT | O_APPEND, 0644);
-          // if (fd != -1) {
-          //   write(fd, s.c_str(), s.size());
-          //   close(fd);
-          // }
-          // std::cerr << s << std::endl;
         },
         []() { return "Calling MPISender::acquire()"; }
     );

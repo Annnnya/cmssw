@@ -19,6 +19,8 @@
 #include <iostream>
 #include <utility>
 
+// structure to store serialized product buffers so they don't go out of scope 
+// and MPI_Request for every send to wait for it later 
 struct MPIAsyncKeeper {
   std::vector<std::shared_ptr<TBufferFile>> buffers_to_keep_alive;
   std::list<MPI_Request> requests;
