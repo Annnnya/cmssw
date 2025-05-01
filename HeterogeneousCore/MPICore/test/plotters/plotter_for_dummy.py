@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 # === CONFIGURATION ===
 
 # Path to your summary CSV file
-summary_file = "/data/user/apolova/dev1/CMSSW_15_0_0/src/HeterogeneousCore/MPICore/test/test_results_thesis/dummy/mpich/simple_async_vci/different_sockets/local_summary_table.csv"
+summary_file = "/data/user/apolova/dev1/CMSSW_15_0_0/src/HeterogeneousCore/MPICore/test/test_results_thesis/dummy/mpich/async/different_machines/remote_summary_table.csv"
 
 # === LOAD DATA ===
 
@@ -42,4 +42,4 @@ plt.grid(True)
 plt.legend(title="Message Size", loc="best")
 plt.tight_layout()
 
-plt.savefig("dummy_scaling_mpich_async_vcis")
+plt.savefig("dummy_scaling_mpich_async_mg")

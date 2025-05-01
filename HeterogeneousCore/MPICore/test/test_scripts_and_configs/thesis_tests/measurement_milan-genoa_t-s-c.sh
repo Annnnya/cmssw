@@ -5,15 +5,16 @@ runs=6
 
 # Threads/Streams combinations to test
 thread_stream_combos=("1:1" "4:4" "8:8" "16:16" "24:24" "32:32")
-# thread_stream_combos=("1:1")
 
+# Message sizes in bytes
+message_sizes=(4 1024 $((1024*1024))) # 4B, 1KB, 1MB
 
 # Scripts to run
-script_local="hlt_local.py"
-script_remote="hlt_remote.py"
+script_local="dummy_configs/dummy_local_3send.py"
+script_remote="dummy_configs/dummy_remote_3rec.py"
 
 # Base directory for logs
-BASE_DIR="../../test_results_thesis/mpich/simple_async/milan-genoa_ucx_t-s-c"
+BASE_DIR="../../test_results_thesis/dummy/mpich/sync/remote_different_sockets"
 mkdir -p "$BASE_DIR"
 
 # Hostnames
@@ -30,62 +31,64 @@ absolute_base_dir=$(realpath "$BASE_DIR")
 # Path to MPICH mpirun
 MPIRUN=/nfshome0/apolova/mpich-4.3.0-install/bin/mpirun
 
-for combo in "${thread_stream_combos[@]}"; do
-    IFS=':' read -r threads streams <<< "$combo"
+for message_size in "${message_sizes[@]}"; do
+    echo "=== Testing MESSAGE_SIZE=$message_size ==="
+    export MESSAGE_SIZE=$message_size
 
-    end_core=$((threads - 1))
+    for combo in "${thread_stream_combos[@]}"; do
+        IFS=':' read -r threads streams <<< "$combo"
 
-    TEST_DIR="$BASE_DIR/test_t${threads}s${streams}"
-    absolute_test_dir="$absolute_base_dir/test_t${threads}s${streams}"
+        end_core=$((threads - 1))
 
-    mkdir -p "$TEST_DIR"
+        TEST_DIR="$BASE_DIR/test_m${message_size}_t${threads}s${streams}"
+        absolute_test_dir="$absolute_base_dir/test_m${message_size}_t${threads}s${streams}"
 
-    # Create the directory remotely
-    echo "Creating directory on remote: $absolute_test_dir"
-    ssh "$remote_host" "mkdir -p $absolute_test_dir"
+        mkdir -p "$TEST_DIR"
+        ssh "$remote_host" "mkdir -p $absolute_test_dir"
 
-    echo "=== Running tests with ${threads} threads, ${streams} streams, CPUs: 0-$end_core ==="
+        echo "=== Running tests with ${threads} threads, ${streams} streams, message size ${message_size} bytes, CPUs: 0-$end_core ==="
 
-    for i in $(seq 1 $runs); do
-        echo "Run #$i for t${threads}s${streams} on CPU list: 0-$end_core"
+        for i in $(seq 1 $runs); do
+            echo "Run #$i for m${message_size}_t${threads}s${streams} on CPU list: 0-$end_core"
 
-        run_id=$i
-        exp_threads=$threads
-        exp_streams=$streams
-        exp_name="milan-genoa_t${threads}s${streams}_r${i}"
-        exp_output_dir="$absolute_test_dir"
-        throughput_log_file="$absolute_base_dir/throughputs.txt"
+            run_id=$i
+            exp_threads=$threads
+            exp_streams=$streams
+            exp_name="dummy_remote_m${message_size}_t${threads}s${streams}_r${i}"
+            exp_output_dir="$absolute_test_dir"
+            throughput_log_file="$absolute_base_dir/throughputs.txt"
 
-        # Launch processes
-        $MPIRUN \
-            -hosts "$remote_host","$local_host" \
-            -np 1 \
-            -env UCX_TLS rc_x,ud_x,self,shm \
-            -env LD_LIBRARY_PATH "$LD_LIBRARY_PATH" \
-            -env UCX_NET_DEVICES "$remote_ucx_dev" \
-            -env RUN_ID "$run_id" \
-            -env EXPERIMENT_THREADS "$exp_threads" \
-            -env EXPERIMENT_STREAMS "$exp_streams" \
-            -env EXPERIMENT_NAME "$exp_name" \
-            -env EXPERIMENT_OUTPUT_DIR "$exp_output_dir" \
-            -env THROUGHPUT_LOG_FILE "$throughput_log_file" \
-            numactl --physcpubind=0-"${end_core}" cmsRun "$script_remote" \
-            : \
-            -np 1 \
-            -env UCX_TLS rc_x,ud_x,self,shm \
-            -env LD_LIBRARY_PATH "$LD_LIBRARY_PATH" \
-            -env UCX_NET_DEVICES "$local_ucx_dev" \
-            -env RUN_ID "$run_id" \
-            -env EXPERIMENT_THREADS "$exp_threads" \
-            -env EXPERIMENT_STREAMS "$exp_streams" \
-            -env EXPERIMENT_NAME "$exp_name" \
-            -env EXPERIMENT_OUTPUT_DIR "$exp_output_dir" \
-            -env THROUGHPUT_LOG_FILE "$throughput_log_file" \
-            numactl --physcpubind=0-"${end_core}" cmsRun "$script_local"
+            $MPIRUN \
+                -hosts "$remote_host","$local_host" \
+                -np 1 \
+                -env UCX_TLS rc_x,ud_x,self,shm \
+                -env LD_LIBRARY_PATH "$LD_LIBRARY_PATH" \
+                -env UCX_NET_DEVICES "$remote_ucx_dev" \
+                -env RUN_ID "$run_id" \
+                -env EXPERIMENT_THREADS "$exp_threads" \
+                -env EXPERIMENT_STREAMS "$exp_streams" \
+                -env EXPERIMENT_NAME "$exp_name" \
+                -env EXPERIMENT_OUTPUT_DIR "$exp_output_dir" \
+                -env THROUGHPUT_LOG_FILE "$throughput_log_file" \
+                -env MESSAGE_SIZE "$message_size" \
+                numactl --physcpubind=0-"${end_core}" cmsRun "$script_remote" \
+                : \
+                -np 1 \
+                -env UCX_TLS rc_x,ud_x,self,shm \
+                -env LD_LIBRARY_PATH "$LD_LIBRARY_PATH" \
+                -env UCX_NET_DEVICES "$local_ucx_dev" \
+                -env RUN_ID "$run_id" \
+                -env EXPERIMENT_THREADS "$exp_threads" \
+                -env EXPERIMENT_STREAMS "$exp_streams" \
+                -env EXPERIMENT_NAME "$exp_name" \
+                -env EXPERIMENT_OUTPUT_DIR "$exp_output_dir" \
+                -env THROUGHPUT_LOG_FILE "$throughput_log_file" \
+                -env MESSAGE_SIZE "$message_size" \
+                numactl --physcpubind=0-"${end_core}" cmsRun "$script_local"
+        done
 
+        echo "✅ Completed tests for threads=$threads, streams=$streams, message size=$message_size bytes"
     done
-
-    echo "Completed tests for threads=$threads, streams=$streams"
 done
 
-echo "All cross-machine tests completed!"
+echo "✅ All cross-machine dummy tests completed!"
