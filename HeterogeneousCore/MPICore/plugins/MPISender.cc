@@ -104,7 +104,8 @@ public:
       event.getByToken(entry.token, handle);
       productData.emplace_back(entry.wrappedType, handle.product());
     }
-  
+    
+    // Submit sending of all products to run in the additional asynchronous threadpool
     edm::Service<edm::Async> as;
     as->runAsync(
         std::move(holder),

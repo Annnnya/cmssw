@@ -1,1 +1,0 @@
-[THROUGHPUT] vci4_t128s128_n6-7_r4 | avg: 51.2621 ± 57.7784 ev/s

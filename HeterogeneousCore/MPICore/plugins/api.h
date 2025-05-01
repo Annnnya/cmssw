@@ -19,11 +19,6 @@
 #include <iostream>
 #include <utility>
 
-struct MPIAsyncKeeper {
-  std::vector<std::shared_ptr<TBufferFile>> buffers_to_keep_alive;
-  std::list<MPI_Request> requests;
-};
-
 class MPIChannel {
 public:
   MPIChannel() = default;
@@ -98,15 +93,6 @@ public:
       sendSerializedProduct_(instance, product.typeOf().getClass(), product.address());
     } else {
       sendTrivialProduct_(instance, product);
-    }
-  }
-
-  // transfer a wrapped object using the TrivialCopyTraits or its ROOT dictionary
-  void sendProduct(int instance, edm::TypeWithDict const& type, edm::WrapperBase const& wrapper, MPIAsyncKeeper& async_keeper) {
-    if (wrapper.hasTrivialCopyTraits()) {
-      sendTrivialCopyProduct_(instance, &wrapper, async_keeper);
-    } else {
-      sendSerializedProduct_(instance, type.getClass(), &wrapper, async_keeper);
     }
   }
 
@@ -213,14 +199,12 @@ private:
   void receiveTrivialProduct_(int instance, edm::ObjectWithDict& product);
 
   // serialize a generic object using its ROOT dictionary, and send the binary blob
-  void sendSerializedProduct_(int instance, TClass const* type, void const* product, MPIAsyncKeeper& async_keeper);
   void sendSerializedProduct_(int instance, TClass const* type, void const* product);
 
   // receive a binary blob, and deserialize an object of generic type using its ROOT dictionary
   void receiveSerializedProduct_(int instance, TClass const* type, void* product);
 
   // transfer a wrapped object using its TrivialCopyTraits
-  void sendTrivialCopyProduct_(int instance, edm::WrapperBase const* wrapper, MPIAsyncKeeper& async_keeper);
   void sendTrivialCopyProduct_(int instance, edm::WrapperBase const* wrapper);
 
   // receive a wrapped object using its TrivialCopyTraits
