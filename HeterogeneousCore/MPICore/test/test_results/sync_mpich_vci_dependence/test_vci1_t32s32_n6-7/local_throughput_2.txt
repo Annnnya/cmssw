@@ -1,1 +1,0 @@
-[THROUGHPUT] vci1_t32s32_n6-7_r2 | avg: 54.5476 ± 94.044 ev/s

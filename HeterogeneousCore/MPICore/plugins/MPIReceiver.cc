@@ -89,21 +89,8 @@ public:
     // read the MPIToken used to establish the communication channel
     MPIToken token = event.get(upstream_);
 
-    // Receive the number of products
-    // int numProducts;
-    // token.channel()->receiveProduct(instance_, numProducts);
-    // edm::LogVerbatim("MPIReceiver") << "Received number of products: " << numProducts;
-
     for (size_t i=0; i<products_.size(); ++i) {
       auto const& entry = products_[i];
-      // std::unique_ptr<edm::WrapperBase> wrapper(
-      //     reinterpret_cast<edm::WrapperBase*>(entry.wrappedType.getClass()->New()));
-
-      // // receive the data sent over the MPI channel
-      // // note: currently this uses a blocking probe/recv
-      // token.channel()->receiveProduct(instance_, entry.wrappedType, *wrapper);
-
-      // put the data into the Event
       event.put(entry.token, std::move(received_products_[i]));
     }
 
