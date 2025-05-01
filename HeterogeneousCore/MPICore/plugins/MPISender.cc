@@ -90,11 +90,12 @@ public:
       edm::Handle<edm::WrapperBase> handle(entry.type.typeInfo());
       event.getByToken(entry.token, handle);
       edm::WrapperBase const* wrapper = handle.product();
-      // send the products over MPI
-      // note: currently this uses a blocking send
+      // put products in the memory of the peer
       token.channel()->putProduct(instance_, entry.wrappedType, *wrapper, putRegions);
     }
+    //make sure puts completed
     token.channel()->flush();
+    // send offsets and sizes of put products
     token.channel()->sendRegions(instance_, putRegions);
 
     // write a shallow copy of the channel to the output, so other modules can consume it

@@ -187,6 +187,7 @@ public:
     }
   }
 
+  // make sure previously issued puts on window completed
   void flush();
 
 private:
@@ -253,11 +254,12 @@ private:
   // receive a wrapped object using its TrivialCopyTraits
   void receiveTrivialCopyProduct_(int instance, edm::WrapperBase* wrapper);
 
-
-  
+  //put products with continuous memory regions into peer's memory window
   void putTrivialProduct_(int instance, edm::WrapperBase const* wrapper, std::vector<OffsetSizePair>& putRegions);
+  //serialize and put the product buffers into the peers window
   void serializeAndPutProduct_(int instance, TClass const* type, void const* product, std::vector<OffsetSizePair>& putRegions);
 
+  //read serialized buffers from window on receiver side, and deserialize them into products
   void readSerializedProductFromWindow_(
     int instance,
     TClass const* type,
@@ -265,6 +267,8 @@ private:
     const std::vector<OffsetSizePair>& putRegions,
     size_t& regionIndex
   );
+
+  //read trivially copyable products from window and write into event products
   void readTrivialProductFromWindow_(
     int instance,
     edm::WrapperBase* wrapper,
