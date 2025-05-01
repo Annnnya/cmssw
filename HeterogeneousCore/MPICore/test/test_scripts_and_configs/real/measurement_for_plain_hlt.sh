@@ -36,9 +36,6 @@ for combo in "${thread_stream_combos[@]}"; do
             export EXPERIMENT_OUTPUT_DIR="$TEST_DIR"
             export THROUGHPUT_LOG_FILE="../../test_results/local_thread_numa_dependence/throughputs.txt"
 
-            # Optional: Clear caches (if you want cold-start measurements)
-            # sudo sh -c "echo 3 > /proc/sys/vm/drop_caches"
-
             # Run the test pinned to the specified NUMA node(s)
             numactl -N "$numa" cmsRun "$local_script_name"
         done
