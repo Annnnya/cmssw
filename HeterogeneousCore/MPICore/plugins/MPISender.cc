@@ -96,25 +96,15 @@ public:
 
   void acquire(edm::Event const& event, edm::EventSetup const&, edm::WaitingTaskWithArenaHolder holder) final {
     MPIToken token = event.get(upstream_);
-  
-    // Pre-fetch all handles before the async part
-    std::vector<std::pair<edm::TypeWithDict, edm::WrapperBase const*>> productData;
-    for (auto const& entry : products_) {
-      edm::Handle<edm::WrapperBase> handle(entry.type.typeInfo());
-      event.getByToken(entry.token, handle);
-      productData.emplace_back(entry.wrappedType, handle.product());
-    }
+
+    int numProducts = static_cast<int>(products_.size());
     
     // Submit sending of all products to run in the additional asynchronous threadpool
     edm::Service<edm::Async> as;
     as->runAsync(
         std::move(holder),
-        [this, token, productData = std::move(productData)]() {
-          for (size_t i = 0; i < products_.size(); ++i) {
-            auto const& entry = products_[i];
-            auto const& [wrappedType, wrapper] = productData[i];
-            token.channel()->sendProduct(instance_, wrappedType, *wrapper);
-          }
+        [this, token, numProducts]() {
+          token.channel()->sendProduct(instance_, numProducts);
         },
         []() { return "Calling MPISender::acquire()"; }
     );
@@ -123,6 +113,16 @@ public:
 
   void produce(edm::Event& event, edm::EventSetup const&) final {
     MPIToken token = event.get(upstream_);
+
+    for (auto const& entry : products_) {
+      // read the products to be sent over the MPI channel
+      edm::Handle<edm::WrapperBase> handle(entry.type.typeInfo());
+      event.getByToken(entry.token, handle);
+      edm::WrapperBase const* wrapper = handle.product();
+      // send the products over MPI
+      // note: currently this uses a blocking send
+      token.channel()->sendProduct(instance_, entry.wrappedType, *wrapper);
+    }
     // write a shallow copy of the channel to the output, so other modules can consume it
     // to indicate that they should run after this
     event.emplace(token_, token);

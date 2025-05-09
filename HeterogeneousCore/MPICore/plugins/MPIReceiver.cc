@@ -26,6 +26,8 @@
 
 #include <condition_variable>
 #include <mutex>
+#include <cassert>
+
 // local include files
 #include "api.h"
 
@@ -63,22 +65,14 @@ public:
   void acquire(edm::Event const& event, edm::EventSetup const&, edm::WaitingTaskWithArenaHolder holder) final {
     MPIToken token = event.get(upstream_);
   
-    // Create a shared vector to hold received products, safely across threads
-    auto received = std::make_shared<std::vector<std::unique_ptr<edm::WrapperBase>>>();
-    received->reserve(products_.size());
-  
     edm::Service<edm::Async> as;
     as->runAsync(
         std::move(holder),
-        [this, token, received]() {
-          for (auto const& entry : products_) {
-            std::unique_ptr<edm::WrapperBase> wrapper(
-                reinterpret_cast<edm::WrapperBase*>(entry.wrappedType.getClass()->New()));
-            token.channel()->receiveProduct(instance_, entry.wrappedType, *wrapper);
-            received->push_back(std::move(wrapper));
-          }
-          // store into member on main thread, after async completes
-          this->received_products_ = std::move(*received);
+        [this, token]() {
+          int numProducts;
+          token.channel()->receiveProduct(instance_, numProducts);
+          // edm::LogAbsolute("MPIReceiver") << "Received number of products: " << numProducts;
+          assert((numProducts == static_cast<int>(products_.size())) && "Receiver number of products is different than expected");
         },
         []() { return "Calling MPIReceiver::acquire()"; }
     );
@@ -89,22 +83,16 @@ public:
     // read the MPIToken used to establish the communication channel
     MPIToken token = event.get(upstream_);
 
-    // Receive the number of products
-    // int numProducts;
-    // token.channel()->receiveProduct(instance_, numProducts);
-    // edm::LogVerbatim("MPIReceiver") << "Received number of products: " << numProducts;
+    for (auto const& entry : products_) {
+      std::unique_ptr<edm::WrapperBase> wrapper(
+          reinterpret_cast<edm::WrapperBase*>(entry.wrappedType.getClass()->New()));
 
-    for (size_t i=0; i<products_.size(); ++i) {
-      auto const& entry = products_[i];
-      // std::unique_ptr<edm::WrapperBase> wrapper(
-      //     reinterpret_cast<edm::WrapperBase*>(entry.wrappedType.getClass()->New()));
-
-      // // receive the data sent over the MPI channel
-      // // note: currently this uses a blocking probe/recv
-      // token.channel()->receiveProduct(instance_, entry.wrappedType, *wrapper);
+      // receive the data sent over the MPI channel
+      // note: currently this uses a blocking probe/recv
+      token.channel()->receiveProduct(instance_, entry.wrappedType, *wrapper);
 
       // put the data into the Event
-      event.put(entry.token, std::move(received_products_[i]));
+      event.put(entry.token, std::move(wrapper));
     }
 
     // write a shallow copy of the channel to the output, so other modules can consume it

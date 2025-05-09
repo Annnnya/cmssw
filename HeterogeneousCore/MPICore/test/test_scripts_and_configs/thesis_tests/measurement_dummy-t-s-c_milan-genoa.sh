@@ -14,7 +14,7 @@ script_local="dummy_configs/dummy_local_3send.py"
 script_remote="dummy_configs/dummy_remote_3rec.py"
 
 # Base directory for logs
-BASE_DIR="../../test_results_thesis/dummy/mpich/async/different_machines"
+BASE_DIR="../../test_results_thesis/dummy/mpich/async_number_of_products/different_machines"
 mkdir -p "$BASE_DIR"
 
 for message_size in "${message_sizes[@]}"; do

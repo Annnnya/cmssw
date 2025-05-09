@@ -5,14 +5,16 @@ import os
 # ==== INPUT FILES ====
 
 files = [
-    {"one machine, different sockets": "/data/user/apolova/dev1/CMSSW_15_0_0/src/HeterogeneousCore/MPICore/test/test_results_thesis/mpich/simple_async/local-remote_t-s-c_different-sockets/remote_summary_table.csv"},
-    {"one machine, defferent sockets with remote fixed at 4 cores": "/data/user/apolova/dev1/CMSSW_15_0_0/src/HeterogeneousCore/MPICore/test/test_results_thesis/mpich/simple_async/local-remote_t-s-c_remote_oversub/remote_4/local_summary_table.csv"},
-    {"local and remote on same cores": "/data/user/apolova/dev1/CMSSW_15_0_0/src/HeterogeneousCore/MPICore/test/test_results_thesis/mpich/simple_async/local-remote_t-s-c_same_cores/local_summary_table.csv"},
-    {"whole pipeline without split": "/data/user/apolova/dev1/CMSSW_15_0_0/src/HeterogeneousCore/MPICore/test/test_results_thesis/whole_hlt_t-s-c/whole_summary_table.csv"},
-    {"milan-genoa over IB": "/data/user/apolova/dev1/CMSSW_15_0_0/src/HeterogeneousCore/MPICore/test/test_results_thesis/mpich/simple_async/milan-genoa_ucx_t-s-c/local_summary_table.csv"}
+    {"sync": "/data/user/apolova/dev1/CMSSW_15_0_0/src/HeterogeneousCore/MPICore/test/test_results_thesis/mpich/sync/local-remote_t-s-c_different-sockets/local_summary_table.csv"},
+    {"number of products mpich": "/data/user/apolova/dev1/CMSSW_15_0_0/src/HeterogeneousCore/MPICore/test/test_results_thesis/mpich/async_number_of_products/local-remote_t-s-c_different-sockets/local_summary_table.csv"},
+    # {"one machine, defferent sockets with remote fixed at 4 cores": "/data/user/apolova/dev1/CMSSW_15_0_0/src/HeterogeneousCore/MPICore/test/test_results_thesis/mpich/simple_async/local-remote_t-s-c_remote_oversub/remote_4/local_summary_table.csv"},
+    # {"local and remote on same cores": "/data/user/apolova/dev1/CMSSW_15_0_0/src/HeterogeneousCore/MPICore/test/test_results_thesis/mpich/simple_async/local-remote_t-s-c_same_cores/local_summary_table.csv"},
+    {"whole pipeline without split": "/data/user/apolova/dev1/CMSSW_15_0_0/src/HeterogeneousCore/MPICore/test/test_results_thesis/whole_hlt_t-s-c/whole_summary_table.csv"}
+    # {"milan-genoa over IB": "/data/user/apolova/dev1/CMSSW_15_0_0/src/HeterogeneousCore/MPICore/test/test_results_thesis/mpich/simple_async/milan-genoa_ucx_t-s-c/local_summary_table.csv"},
+    
 ]
 
-output_dir = "./comparative_plots_simple_async_mpich"
+output_dir = "./figures/num_of_prod"
 
 # ==== READ & PREPARE DATA ====
 
