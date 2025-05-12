@@ -3,6 +3,7 @@
 
 // externals headers
 #include <mpi.h>
+#include <utility>
 #include <type_traits>
 
 // ROOT headers
@@ -15,6 +16,23 @@
 
 // local headers
 #include "messages.h"
+
+
+struct MPIAsyncKeeper {
+  std::vector<std::shared_ptr<TBufferFile>> buffers_to_keep_alive;
+  std::list<MPI_Request> requests;
+};
+
+struct oneMessageHandler {
+  MPI_Message message;
+  MPI_Status status;
+};
+
+struct MessageHandlers {
+  std::vector<oneMessageHandler> handlers;
+  std::size_t handle_iterator = 0;
+};
+
 
 class MPIChannel {
 public:
@@ -94,6 +112,14 @@ public:
   }
 
   // transfer a wrapped object using the TrivialCopyTraits or its ROOT dictionary
+  void sendProduct(int instance, edm::TypeWithDict const& type, edm::WrapperBase const& wrapper, MPIAsyncKeeper& async_keeper) {
+    if (wrapper.hasTrivialCopyTraits()) {
+      sendTrivialCopyProduct_(instance, &wrapper, async_keeper);
+    } else {
+      sendSerializedProduct_(instance, type.getClass(), &wrapper, async_keeper);
+    }
+  }
+
   void sendProduct(int instance, edm::TypeWithDict const& type, edm::WrapperBase const& wrapper) {
     if (wrapper.hasTrivialCopyTraits()) {
       sendTrivialCopyProduct_(instance, &wrapper);
@@ -142,6 +168,27 @@ public:
       receiveSerializedProduct_(instance, type.getClass(), &wrapper);
     }
   }
+
+  void probeTrivialCopyProduct_(int instance, edm::WrapperBase* wrapper, MessageHandlers& handlers);
+  void probeForProduct(int instance, edm::TypeWithDict const& type, edm::WrapperBase& wrapper, MessageHandlers& handlers) {
+    if (wrapper.hasTrivialCopyTraits()) {
+      probeTrivialCopyProduct_(instance, &wrapper, handlers);
+    } else {
+      probeSerializedProduct_(instance, handlers);
+    }
+  }
+
+  void receiveProduct(edm::TypeWithDict const& type, edm::WrapperBase& wrapper, MessageHandlers& handlers) {
+    if (wrapper.hasTrivialCopyTraits()) {
+      receiveTrivialCopyProduct_(&wrapper, handlers);
+    } else {
+      receiveSerializedProduct_(type.getClass(), &wrapper, handlers);
+    }
+  }
+
+  void receiveSerializedProduct_(TClass const* type, void* product, MessageHandlers& handlers);
+  void probeSerializedProduct_(int instance, MessageHandlers& handlers);
+  void receiveTrivialCopyProduct_(edm::WrapperBase* wrapper, MessageHandlers& handlers);
 
 private:
   // serialize an EDM object to a simplified representation that can be transmitted as an MPI message
@@ -197,12 +244,14 @@ private:
   void receiveTrivialProduct_(int instance, edm::ObjectWithDict& product);
 
   // serialize a generic object using its ROOT dictionary, and send the binary blob
+  void sendSerializedProduct_(int instance, TClass const* type, void const* product, MPIAsyncKeeper& async_keeper);
   void sendSerializedProduct_(int instance, TClass const* type, void const* product);
 
   // receive a binary blob, and deserialize an object of generic type using its ROOT dictionary
   void receiveSerializedProduct_(int instance, TClass const* type, void* product);
 
   // transfer a wrapped object using its TrivialCopyTraits
+  void sendTrivialCopyProduct_(int instance, edm::WrapperBase const* wrapper, MPIAsyncKeeper& async_keeper);
   void sendTrivialCopyProduct_(int instance, edm::WrapperBase const* wrapper);
 
   // receive a wrapped object using its TrivialCopyTraits
