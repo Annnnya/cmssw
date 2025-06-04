@@ -9,7 +9,8 @@ files = [
     {"number of products mpich": "/data/user/apolova/dev1/CMSSW_15_0_0/src/HeterogeneousCore/MPICore/test/test_results_thesis/mpich/async_number_of_products/local-remote_t-s-c_different-sockets/local_summary_table.csv"},
     # {"one machine, defferent sockets with remote fixed at 4 cores": "/data/user/apolova/dev1/CMSSW_15_0_0/src/HeterogeneousCore/MPICore/test/test_results_thesis/mpich/simple_async/local-remote_t-s-c_remote_oversub/remote_4/local_summary_table.csv"},
     # {"local and remote on same cores": "/data/user/apolova/dev1/CMSSW_15_0_0/src/HeterogeneousCore/MPICore/test/test_results_thesis/mpich/simple_async/local-remote_t-s-c_same_cores/local_summary_table.csv"},
-    {"whole pipeline without split": "/data/user/apolova/dev1/CMSSW_15_0_0/src/HeterogeneousCore/MPICore/test/test_results_thesis/whole_hlt_t-s-c/whole_summary_table.csv"}
+    {"whole pipeline without split": "/data/user/apolova/dev1/CMSSW_15_0_0/src/HeterogeneousCore/MPICore/test/test_results_thesis/whole_hlt_t-s-c/whole_summary_table.csv"},
+    {"mpich simple_async": "/data/user/apolova/dev1/CMSSW_15_0_0/src/HeterogeneousCore/MPICore/test/test_results_thesis/mpich/simple_async/local-remote_t-s-c_different-sockets/local_summary_table.csv"},
     # {"milan-genoa over IB": "/data/user/apolova/dev1/CMSSW_15_0_0/src/HeterogeneousCore/MPICore/test/test_results_thesis/mpich/simple_async/milan-genoa_ucx_t-s-c/local_summary_table.csv"},
     
 ]
