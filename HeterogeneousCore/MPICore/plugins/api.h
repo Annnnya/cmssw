@@ -176,7 +176,7 @@ private:
   template <typename T>
   void sendTrivialProduct_(int instance, T const& product) {
     int tag = EDM_MPI_SendTrivialProduct | instance * EDM_MPI_MessageTagWidth_;
-    MPI_Send(&product, sizeof(T), MPI_BYTE, dest_, tag, comm_);
+    MPI_Ssend(&product, sizeof(T), MPI_BYTE, dest_, tag, comm_);
   }
 
   // send and receive generic primitive datatype
