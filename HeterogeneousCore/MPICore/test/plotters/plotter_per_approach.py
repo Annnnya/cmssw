@@ -12,7 +12,8 @@ files = [
     {"synchronous mpich": "/data/user/apolova/dev1/CMSSW_15_0_0/src/HeterogeneousCore/MPICore/test/test_results_thesis/mpich/sync/milan-genoa_ucx_t-s-c/local_summary_table.csv"},
     {"simple asynchronous mpich": "/data/user/apolova/dev1/CMSSW_15_0_0/src/HeterogeneousCore/MPICore/test/test_results_thesis/mpich/simple_async/milan-genoa_ucx_t-s-c/local_summary_table.csv"},
     # {"number of products mpich": "/data/user/apolova/dev1/CMSSW_15_0_0/src/HeterogeneousCore/MPICore/test/test_results_thesis/mpich/async_number_of_products/local-remote_t-s-c_different-sockets/local_summary_table.csv"},
-    {"mpich async number of products": "/data/user/apolova/dev1/CMSSW_15_0_0/src/HeterogeneousCore/MPICore/test/test_results_thesis/mpich/async_number_of_products/milan-genoa_ucx_t-s-c/local_summary_table.csv"}
+    {"mpich async number of products": "/data/user/apolova/dev1/CMSSW_15_0_0/src/HeterogeneousCore/MPICore/test/test_results_thesis/mpich/async_number_of_products/milan-genoa_ucx_t-s-c/local_summary_table.csv"},
+    {"number of products with ssend": "/data/user/apolova/dev1/CMSSW_15_0_0/src/HeterogeneousCore/MPICore/test/test_results_thesis/mpich/async_number_of_products_ssend/milan-genoa_ucx_t-s-c/local_summary_table.csv"}
 
 ]
 
