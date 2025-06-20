@@ -104,6 +104,14 @@ public:
     }
   }
 
+  template <typename T>
+  void issendTrivialProduct_(int instance, T const& product, MPI_Request& request_handler) {
+    assert(std::is_fundamental_v<T>);
+    int tag = EDM_MPI_SendTrivialProduct | instance * EDM_MPI_MessageTagWidth_;
+    MPI_Issend(&product, sizeof(T), MPI_BYTE, dest_, tag, comm_, &request_handler);
+  }
+
+
   // signal that an expected product will not be transmitted
   void sendSkipProduct() { sendEmpty_(EDM_MPI_SkipProduct); }
 

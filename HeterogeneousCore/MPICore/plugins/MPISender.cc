@@ -98,13 +98,16 @@ public:
     MPIToken token = event.get(upstream_);
 
     int numProducts = static_cast<int>(products_.size());
-    
+
+    MPI_Request product_number_handler;
+    token.channel()->issendTrivialProduct_(instance_, numProducts, product_number_handler);
+
     // Submit sending of all products to run in the additional asynchronous threadpool
     edm::Service<edm::Async> as;
     as->runAsync(
         std::move(holder),
-        [this, token, numProducts]() {
-          token.channel()->sendProduct(instance_, numProducts);
+        [this, product_number_handler = std::move(product_number_handler)]() mutable {
+          MPI_Wait(&product_number_handler, MPI_STATUS_IGNORE);
         },
         []() { return "Calling MPISender::acquire()"; }
     );
