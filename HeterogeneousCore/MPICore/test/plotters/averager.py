@@ -86,16 +86,18 @@ def parse_throughput_file(filepath):
                 key = (int(threads), int(streams))
                 throughput_data[key].append((int(run_id), float(avg_val)))
 
-    # Discard warmup (first run by run_id) and average the rest
-    throughput_avg = {}
+    throughput_stats = {}
     for key, values in throughput_data.items():
         values.sort()  # sort by run_id
-        valid = values[1:]  # discard first
-        if valid:
-            avg_throughput = sum(v[1] for v in valid) / len(valid)
-            throughput_avg[key] = avg_throughput
+        valid = [v[1] for v in values[1:]]  # discard warmup
+        if len(valid) >= 2:
+            mean = sum(valid) / len(valid)
+            std = pd.Series(valid).std(ddof=1)
+            sem = std / (len(valid) ** 0.5)
+            throughput_stats[key] = (mean, sem)
 
-    return throughput_avg
+    return throughput_stats
+
 
 def summarize(grouped_entries):
     summary = []
@@ -113,14 +115,17 @@ def summarize(grouped_entries):
 
     return pd.DataFrame(summary)
 
-def attach_throughput(summary_df, throughput_avg):
+def attach_throughput(summary_df, throughput_stats):
     summary_df["throughput_ev_per_s"] = summary_df.apply(
-        lambda row: throughput_avg.get(
-            (row["threads"], row["streams"]), None
-        ),
+        lambda row: throughput_stats.get((row["threads"], row["streams"]), (None, None))[0],
+        axis=1
+    )
+    summary_df["throughput_error"] = summary_df.apply(
+        lambda row: throughput_stats.get((row["threads"], row["streams"]), (None, None))[1],
         axis=1
     )
     return summary_df
+
 
 # === MAIN ===
 

@@ -4,48 +4,55 @@
     "total_real":317.4364576212,
     "threads":1,
     "streams":1,
-    "throughput_ev_per_s":6.209768
+    "throughput_ev_per_s":6.209768,
+    "throughput_error":0.0077472985
   },
   {
     "total_cpu":152.670525132,
     "total_real":188.5186504676,
     "threads":2,
     "streams":2,
-    "throughput_ev_per_s":12.33534
+    "throughput_ev_per_s":12.33534,
+    "throughput_error":0.0272037424
   },
   {
     "total_cpu":170.289624841,
     "total_real":194.590823706,
     "threads":4,
     "streams":4,
-    "throughput_ev_per_s":24.28846
+    "throughput_ev_per_s":24.28846,
+    "throughput_error":0.0294994169
   },
   {
     "total_cpu":201.920752929,
     "total_real":202.1789683792,
     "threads":8,
     "streams":8,
-    "throughput_ev_per_s":47.91452
+    "throughput_ev_per_s":47.91452,
+    "throughput_error":0.1955845659
   },
   {
     "total_cpu":272.3917325752,
     "total_real":222.144444503,
     "threads":16,
     "streams":16,
-    "throughput_ev_per_s":90.0468
+    "throughput_ev_per_s":90.0468,
+    "throughput_error":0.4575592912
   },
   {
     "total_cpu":357.8289146288,
     "total_real":243.0575741306,
     "threads":24,
     "streams":24,
-    "throughput_ev_per_s":129.228
+    "throughput_ev_per_s":129.228,
+    "throughput_error":0.6587375805
   },
   {
     "total_cpu":429.4275324814,
     "total_real":269.650138163,
     "threads":32,
     "streams":32,
-    "throughput_ev_per_s":158.0412
+    "throughput_ev_per_s":158.0412,
+    "throughput_error":1.385307345
   }
 ]
