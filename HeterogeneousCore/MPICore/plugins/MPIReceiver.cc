@@ -68,11 +68,27 @@ public:
 
     //also try unique or optional
     received_meta_ = std::make_shared<ProductMetadataBuilder>();
-    wrappers_.clear();
 
-    token.channel()->receiveMetadata(instance_, received_meta_);
-    assert((received_meta_->productCount() == products_.size()) &&
-           "Receiver number of products is different than expected");
+    edm::Service<edm::Async> as;
+    as->runAsync(
+        std::move(holder),
+        [this, token]() mutable {
+          token.channel()->receiveMetadata(instance_, received_meta_);
+          assert((received_meta_->productCount() == products_.size()) &&
+                "Receiver number of products is different than expected");
+        },
+        []() { return "Calling MPIReceiver::acquire()"; });
+  }
+
+  void produce(edm::Event& event, edm::EventSetup const&) final {
+    // read the MPIToken used to establish the communication channel
+    MPIToken token = event.get(upstream_);
+    
+    std::vector<std::unique_ptr<edm::WrapperBase>> wrappers_;
+
+    size_t full_buffer_size = 0;
+    size_t buffer_offset_ = 0;
+    size_t index = 0;
 
     std::vector<MPI_Request> requests;
 
@@ -102,25 +118,10 @@ public:
       wrappers_.push_back(std::move(wrapper));
     }
 
-    edm::Service<edm::Async> as;
-    as->runAsync(
-        std::move(holder),
-        [this, token, requests = std::move(requests)]() mutable {
-          token.channel()->sendNotify(instance_);
-          for (MPI_Request& req : requests) {
-            MPI_Wait(&req, MPI_STATUS_IGNORE);
-          }
-        },
-        []() { return "Calling MPIReceiver::acquire()"; });
-  }
-
-  void produce(edm::Event& event, edm::EventSetup const&) final {
-    // read the MPIToken used to establish the communication channel
-    MPIToken token = event.get(upstream_);
-
-    size_t full_buffer_size = 0;
-    size_t buffer_offset_ = 0;
-    size_t index = 0;
+    token.channel()->sendNotify(instance_);
+    for (MPI_Request& req : requests) {
+      MPI_Wait(&req, MPI_STATUS_IGNORE);
+    }
 
     received_meta_->resetIterator();
 
@@ -173,7 +174,6 @@ private:
 
   std::shared_ptr<ProductMetadataBuilder> received_meta_;
   std::unique_ptr<TBufferFile> serialized_buffer;
-  std::vector<std::unique_ptr<edm::WrapperBase>> wrappers_;
 };
 
 #include "FWCore/Framework/interface/MakerMacros.h"
