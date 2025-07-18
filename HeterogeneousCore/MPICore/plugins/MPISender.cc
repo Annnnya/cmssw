@@ -81,22 +81,6 @@ public:
                   << product.productInstanceName() << '_' << product.processName() << "\" of type \""
                   << entry.type.name() << "\" over MPI channel instance " << instance_;
 
-              // edm::Handle<edm::WrapperBase> handle(entry.type.typeInfo());
-
-              // edm::WrapperBase const* wrapper = handle.product();
-
-              // parameter getting does not work in constructor, i suppose wee need an event for this
-
-              // if (wrapper->hasTrivialCopyTraits()) {
-              //   metadata_size_ += 9;
-              // } else {
-              // parameter getting does not work in constructor, i suppose wee need an event for this
-
-              // edm::AnyBuffer buffer = wrapper->trivialCopyParameters();
-              // metadata_size_ += buffer.size_bytes();
-              //   metadata_size_ += 9;
-              //   metadata_size_ += 24;
-              // }
               products_.emplace_back(std::move(entry));
               break;
             }
@@ -159,11 +143,18 @@ public:
       index++;
     }
 
+    if (has_serialized_) {
+      meta->setSerializedLen(buffer_->Length());
+    }
+
     // Submit sending of all products to run in the additional asynchronous threadpool
     edm::Service<edm::Async> as;
     as->runAsync(
         std::move(holder),
-        [this, token, meta = std::move(meta)]() { token.channel()->sendMetadata(instance_, meta); },
+        [this, token, meta = std::move(meta)]() {
+          token.channel()->sendMetadata(instance_, meta);
+          token.channel()->receiveNotify(instance_);
+        },
         []() { return "Calling MPISender::acquire()"; });
   }
 

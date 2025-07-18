@@ -45,6 +45,8 @@ public:
 
   // set or reset number of products. will fail if not set called before sending
   void setProductCount(size_t prod_num) { productCount_ = prod_num; }
+  // if length of serialized buffer is not set and serialized data is sent, program will fail
+  void setSerializedLen(size_t buf_len) { serializedBufLen_ = buf_len; }
   void setHeader();
 
   // Sender API
@@ -63,8 +65,10 @@ public:
   // Not memory safe for trivial copy products.
   // Please make sure that ProductMetadataBuilder lives longer than returned ProductMetadata
   ProductMetadata getNext();
+  void resetIterator() { readOffset_ = headerLength_; }
 
   uint64_t productCount() const { return productCount_; }
+  uint64_t serializedBufLen() const { return serializedBufLen_; }
   bool hasMissing() const { return productFlags_ & HasMissing; }
   bool hasSerialized() const { return productFlags_ & HasSerialized; }
   bool hasTrivialCopy() const { return productFlags_ & HasTrivialCopy; }
@@ -76,8 +80,10 @@ private:
   size_t capacity_;
   size_t size_;
   size_t readOffset_;
+  size_t headerLength_ = 17;
   uint8_t productFlags_ = 0;
   uint64_t productCount_ = 0;
+  uint64_t serializedBufLen_ = 0;
 
   void resizeBuffer(size_t newCap);
   void ensureCapacity(size_t needed);

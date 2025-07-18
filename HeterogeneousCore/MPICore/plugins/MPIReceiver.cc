@@ -68,34 +68,18 @@ public:
 
     //also try unique or optional
     received_meta_ = std::make_shared<ProductMetadataBuilder>();
+    wrappers_.clear();
 
-    edm::Service<edm::Async> as;
-    as->runAsync(
-        std::move(holder),
-        [this, token]() {
-          token.channel()->receiveMetadata(instance_, received_meta_);
-          // assert((received_meta_.product_num == products_.size()) &&
-          //        "Receiver number of products is different than expected");
-        },
-        []() { return "Calling MPIReceiver::acquire()"; });
-  }
+    token.channel()->receiveMetadata(instance_, received_meta_);
+    assert((received_meta_->productCount() == products_.size()) &&
+           "Receiver number of products is different than expected");
 
-  void produce(edm::Event& event, edm::EventSetup const&) final {
-    // read the MPIToken used to establish the communication channel
-    MPIToken token = event.get(upstream_);
-    // received_meta_->debugPrintMetadataSummary();
-
-    char* buf_ptr = nullptr;
-    size_t full_buffer_size = 0;
-    size_t buffer_offset_ = 0;
-
-    std::unique_ptr<TBufferFile> serialized_buffer;
+    std::vector<MPI_Request> requests;
 
     if (received_meta_->hasSerialized()) {
-      serialized_buffer = token.channel()->receiveSerializedBuffer(instance_);
-      buf_ptr = serialized_buffer->Buffer();
-      full_buffer_size = serialized_buffer->BufferSize();
-      buffer_offset_ = 0;
+      requests.emplace_back();
+      serialized_buffer =
+          token.channel()->postReceiveSerializedBuffer(instance_, received_meta_->serializedBufLen(), requests.back());
     }
 
     for (auto const& entry : products_) {
@@ -104,20 +88,7 @@ public:
 
       auto product_meta = received_meta_->getNext();
 
-      if (product_meta.kind == ProductMetadata::Kind::Missing) {
-        edm::LogWarning("MPIReceiver") << "Product " << entry.type.name() << " was not received.";
-        continue;  // Skip products that weren't sent
-      }
-
-      else if (product_meta.kind == ProductMetadata::Kind::Serialized) {
-        auto productBuffer = TBufferFile(TBuffer::kRead, product_meta.sizeMeta);
-        assert(buffer_offset_ < full_buffer_size && "serialized data buffer is shorter than expected");
-        productBuffer.SetBuffer(buf_ptr + buffer_offset_, product_meta.sizeMeta, kFALSE /* adopt = false */);
-        buffer_offset_ += product_meta.sizeMeta;
-        entry.wrappedType.getClass()->Streamer(wrapper.get(), productBuffer);
-      }
-
-      else if (product_meta.kind == ProductMetadata::Kind::TrivialCopy) {
+      if (product_meta.kind == ProductMetadata::Kind::TrivialCopy) {
         assert(wrapper->hasTrivialCopyTraits() && "mismatch between expected and factual metadata type");
         wrapper->markAsPresent();
         edm::AnyBuffer buffer = wrapper->trivialCopyParameters();  // constructs buffer with typeid
@@ -125,11 +96,59 @@ public:
         // TDL: can we add func to AnyBuffer to replace pointer to the data?
         std::memcpy(buffer.data(), product_meta.trivialCopyOffset, product_meta.sizeMeta);
         wrapper->trivialCopyInitialize(buffer);
-        token.channel()->receiveInitializedTrivialCopy(instance_, wrapper.get());
+        token.channel()->receiveInitializedTrivialCopy(instance_, wrapper.get(), requests);
+      }
+
+      wrappers_.push_back(std::move(wrapper));
+    }
+
+    edm::Service<edm::Async> as;
+    as->runAsync(
+        std::move(holder),
+        [this, token, requests = std::move(requests)]() mutable {
+          token.channel()->sendNotify(instance_);
+          for (MPI_Request& req : requests) {
+            MPI_Wait(&req, MPI_STATUS_IGNORE);
+          }
+        },
+        []() { return "Calling MPIReceiver::acquire()"; });
+  }
+
+  void produce(edm::Event& event, edm::EventSetup const&) final {
+    // read the MPIToken used to establish the communication channel
+    MPIToken token = event.get(upstream_);
+
+    size_t full_buffer_size = 0;
+    size_t buffer_offset_ = 0;
+    size_t index = 0;
+
+    received_meta_->resetIterator();
+
+    for (auto const& entry : products_) {
+      std::unique_ptr<edm::WrapperBase> wrapper = std::move(wrappers_[index]);
+      auto product_meta = received_meta_->getNext();
+
+      if (product_meta.kind == ProductMetadata::Kind::Missing) {
+        edm::LogWarning("MPIReceiver") << "Product " << entry.type.name() << " was not received.";
+        index++;
+        continue;  // Skip products that weren't sent
+      }
+
+      else if (product_meta.kind == ProductMetadata::Kind::Serialized) {
+        full_buffer_size = serialized_buffer->BufferSize();
+        auto productBuffer = TBufferFile(TBuffer::kRead, product_meta.sizeMeta);
+        productBuffer.SetBuffer(
+            serialized_buffer->Buffer() + buffer_offset_, product_meta.sizeMeta, kFALSE /* adopt = false */);
+        buffer_offset_ += product_meta.sizeMeta;
+        entry.wrappedType.getClass()->Streamer(wrapper.get(), productBuffer);
+      }
+
+      else if (product_meta.kind == ProductMetadata::Kind::TrivialCopy) {
         wrapper->trivialCopyFinalize();
       }
       // put the data into the Event
       event.put(entry.token, std::move(wrapper));
+      index++;
     }
 
     assert(buffer_offset_ == full_buffer_size && "serialized data buffer is not equal to the expected length");
@@ -153,6 +172,8 @@ private:
   int32_t const instance_;                  // instance used to identify the source-destination pair
 
   std::shared_ptr<ProductMetadataBuilder> received_meta_;
+  std::unique_ptr<TBufferFile> serialized_buffer;
+  std::vector<std::unique_ptr<edm::WrapperBase>> wrappers_;
 };
 
 #include "FWCore/Framework/interface/MakerMacros.h"

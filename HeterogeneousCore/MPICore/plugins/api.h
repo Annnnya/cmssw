@@ -169,14 +169,17 @@ public:
 
   // receive a binary blob, and deserialize an object of generic type using its ROOT dictionary
   void receiveSerializedProduct_(int instance, TClass const* type, void* product);
-  std::unique_ptr<TBufferFile> receiveSerializedBuffer(int instance);
+  std::unique_ptr<TBufferFile> postReceiveSerializedBuffer(int instance, int size, MPI_Request& request);
+
+  void sendNotify(int instance);
+  void receiveNotify(int instance);
 
   // transfer a wrapped object using its TrivialCopyTraits
   void sendTrivialCopyProduct_(int instance, edm::WrapperBase const* wrapper);
 
   // receive a wrapped object using its TrivialCopyTraits
   void receiveTrivialCopyProduct_(int instance, edm::WrapperBase* wrapper);
-  void receiveInitializedTrivialCopy(int instance, edm::WrapperBase* wrapper);
+  void receiveInitializedTrivialCopy(int instance, edm::WrapperBase* wrapper, std::vector<MPI_Request>& requests);
 
 private:
   // serialize an EDM object to a simplified representation that can be transmitted as an MPI message

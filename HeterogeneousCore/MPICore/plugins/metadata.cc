@@ -4,15 +4,15 @@
 #include <iostream>
 
 ProductMetadataBuilder::ProductMetadataBuilder() : buffer_(nullptr), capacity_(0), size_(0), readOffset_(0) {
-  // reserve at least 9 bytes for header
-  reserve(9);
-  size_ = 9;
+  // reserve at least headerLength_ bytes for header
+  reserve(headerLength_);
+  size_ = headerLength_;
 }
 
 ProductMetadataBuilder::ProductMetadataBuilder(size_t expectedSize)
     : buffer_(nullptr), capacity_(0), size_(0), readOffset_(0) {
-  reserve(expectedSize + 9);
-  size_ = 9;
+  reserve(expectedSize + headerLength_);
+  size_ = headerLength_;
 }
 
 ProductMetadataBuilder::~ProductMetadataBuilder() { std::free(buffer_); }
@@ -47,9 +47,10 @@ void ProductMetadataBuilder::reserve(size_t bytes) {
 }
 
 void ProductMetadataBuilder::setHeader() {
-  assert(size_ >= 9 && "Buffer must reserve space for header");
-  std::memcpy(buffer_, &productCount_, sizeof(uint64_t));  // first 8 bytes
-  buffer_[8] = productFlags_;                              // 9th byte
+  assert(size_ >= headerLength_ && "Buffer must reserve space for header");
+  std::memcpy(buffer_, &productCount_, sizeof(uint64_t));
+  std::memcpy(buffer_ + 8, &serializedBufLen_, sizeof(uint64_t));
+  buffer_[16] = productFlags_;
 }
 
 void ProductMetadataBuilder::addMissing() {
@@ -76,13 +77,14 @@ size_t ProductMetadataBuilder::size() const { return size_; }
 std::span<const uint8_t> ProductMetadataBuilder::buffer() const { return {buffer_, size_}; }
 
 void ProductMetadataBuilder::receiveMetadata(MPI_Message message, size_t size) {
-  assert(size_ == 9 && "metadata receive buffer must be empty");
+  assert(size_ == headerLength_ && "metadata receive buffer must be empty");
   assert(size != 0 && "metadata message is empty");
   resizeBuffer(static_cast<size_t>(size));
   MPI_Mrecv(buffer_, size, MPI_BYTE, &message, MPI_STATUS_IGNORE);
-  if (size < 9)
+  if (size < headerLength_)
     throw std::runtime_error("Metadata message too short");
-  productCount_ = consume<size_t>();
+  productCount_ = consume<uint64_t>();
+  serializedBufLen_ = consume<uint64_t>();
   assert(productCount_ > 0 && "no products sent or product number not set");
   productFlags_ = consume<ProductFlags>();
   size_ += size;

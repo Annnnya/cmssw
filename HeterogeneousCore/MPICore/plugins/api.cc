@@ -176,7 +176,7 @@ void MPIChannel::receiveMetadata(int instance, std::shared_ptr<ProductMetadataBu
 
 void MPIChannel::sendBuffer(const void* buf, size_t size, int instance, EDM_MPI_MessageTag tag) {
   int commtag = tag | instance * EDM_MPI_MessageTagWidth_;
-  MPI_Send(buf, size, MPI_BYTE, dest_, commtag, comm_);
+  MPI_Rsend(buf, size, MPI_BYTE, dest_, commtag, comm_);
 }
 
 void MPIChannel::sendSerializedProduct_(int instance, TClass const* type, void const* product) {
@@ -186,18 +186,22 @@ void MPIChannel::sendSerializedProduct_(int instance, TClass const* type, void c
   MPI_Send(buffer.Buffer(), buffer.Length(), MPI_BYTE, dest_, tag, comm_);
 }
 
-std::unique_ptr<TBufferFile> MPIChannel::receiveSerializedBuffer(int instance) {
+std::unique_ptr<TBufferFile> MPIChannel::postReceiveSerializedBuffer(int instance, int size, MPI_Request& request) {
   int tag = EDM_MPI_SendSerializedProduct | instance * EDM_MPI_MessageTagWidth_;
-  MPI_Message message;
-  MPI_Status status;
-
-  MPI_Mprobe(dest_, tag, comm_, &message, &status);
-  int size;
-  MPI_Get_count(&status, MPI_BYTE, &size);
-
   auto buffer = std::make_unique<TBufferFile>(TBuffer::kRead, size);
-  MPI_Mrecv(buffer->Buffer(), size, MPI_BYTE, &message, &status);
+  MPI_Irecv(buffer->Buffer(), size, MPI_BYTE, dest_, tag, comm_, &request);
   return buffer;
+}
+
+void MPIChannel::sendNotify(int instance) {
+  int tag = EDM_MPI_SendEmptyNotify | instance * EDM_MPI_MessageTagWidth_;
+  MPI_Send(nullptr, 0, MPI_BYTE, dest_, tag, comm_);
+}
+
+void MPIChannel::receiveNotify(int instance) {
+  int tag = EDM_MPI_SendEmptyNotify | instance * EDM_MPI_MessageTagWidth_;
+  MPI_Status status;
+  MPI_Recv(nullptr, 0, MPI_BYTE, dest_, tag, comm_, &status);
 }
 
 void MPIChannel::receiveSerializedProduct_(int instance, TClass const* type, void* product) {
@@ -226,7 +230,7 @@ void MPIChannel::sendTrivialCopyProduct_(int instance, edm::WrapperBase const* w
   // TODO send the number of regions ?
   for (size_t i = 0; i < regions.size(); ++i) {
     assert(regions[i].data() != nullptr);
-    MPI_Send(regions[i].data(), regions[i].size_bytes(), MPI_BYTE, dest_, tag, comm_);
+    MPI_Rsend(regions[i].data(), regions[i].size_bytes(), MPI_BYTE, dest_, tag, comm_);
   }
 }
 
@@ -270,41 +274,17 @@ void MPIChannel::receiveTrivialCopyProduct_(int instance, edm::WrapperBase* wrap
   wrapper->trivialCopyFinalize();
 }
 
-void MPIChannel::receiveInitializedTrivialCopy(int instance, edm::WrapperBase* wrapper) {
+void MPIChannel::receiveInitializedTrivialCopy(int instance,
+                                               edm::WrapperBase* wrapper,
+                                               std::vector<MPI_Request>& requests) {
   int tag = EDM_MPI_SendTrivialCopyProduct | instance * EDM_MPI_MessageTagWidth_;
-
-  MPI_Message message;
-  MPI_Status status;
-  int size;
-
-  // mark the wrapped object as present
-  // wrapper->markAsPresent();
-
-  // // if the wrapped type requires it, send the properties required toinitialise the remote copy
-  // if (wrapper->hasTrivialCopyProperties()) {
-  //   edm::AnyBuffer buffer = wrapper->trivialCopyParameters();
-  //   MPI_Mprobe(dest_, tag, comm_, &message, &status);
-  //   // check that the message size matches the expected buffer size
-  //   MPI_Get_count(&status, MPI_BYTE, &size);
-  //   assert(static_cast<int>(buffer.size_bytes()) == size);
-  //   // receive the properties
-  //   MPI_Mrecv(buffer.data(), buffer.size_bytes(), MPI_BYTE, &message, &status);
-  //   wrapper->trivialCopyInitialize(buffer);
-  // }
 
   // receive the memory regions
   auto regions = wrapper->trivialCopyRegions();
   // TODO receive and validate the number of regions ?
   for (size_t i = 0; i < regions.size(); ++i) {
     assert(regions[i].data() != nullptr);
-    MPI_Mprobe(dest_, tag, comm_, &message, &status);
-    // check that the message size matches the expected region size
-    MPI_Get_count(&status, MPI_BYTE, &size);
-    assert(static_cast<int>(regions[i].size_bytes()) == size);
-    // receive the data region
-    MPI_Mrecv(regions[i].data(), regions[i].size_bytes(), MPI_BYTE, &message, &status);
+    requests.emplace_back();
+    MPI_Irecv(regions[i].data(), regions[i].size_bytes(), MPI_BYTE, dest_, tag, comm_, &requests.back());
   }
-
-  // finalize the clone after the trivialCopy, if the type requires it
-  // wrapper->trivialCopyFinalize();
 }
