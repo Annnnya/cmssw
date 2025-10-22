@@ -49,7 +49,7 @@
 #include "FWCore/ParameterSet/interface/ParameterSetDescription.h"
 #include "FWCore/Reflection/interface/ObjectWithDict.h"
 #include "FWCore/Utilities/interface/EDMException.h"
-
+#include "TrivialSerialisation/Common/interface/SerialiserFactory.h"
 #include "TrivialSerialisation/Common/interface/SerialiserFactory.h"
 #include "TrivialSerialisation/Common/interface/TrivialSerialiserBase.h"
 
@@ -142,8 +142,9 @@ namespace edmtest {
       edm::WrapperBase const* wrapper = handle.product();
       std::unique_ptr<edm::WrapperBase> clone(static_cast<edm::WrapperBase*>(product.wrappedType_.getClass()->New()));
 
-      // get a "serialiserSource" object from the plugin factory.
-      // serializeSource objects can produce, for a given type, both const and mutable TrivialSerialisers.
+
+      // get a "serialiser" object from the plugin factory. This object can
+      // produce, for a given type, both const and mutable TrivialSerialisers.
       std::unique_ptr<ngt::SerialiserBase> serialiser{
           ngt::SerialiserFactory::get()->tryToCreate(product.objectType_.typeInfo().name())};
 

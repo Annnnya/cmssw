@@ -9,6 +9,28 @@
 #include <numeric>
 #include <cstring>
 
+// Catch2 tests for TrivialCopyTraits
+//
+// This test file defines various types, and specializes TrivialCopyTraits for them.
+//
+// The following tests are performed:
+//
+// - TrivialCopyTraits specializations for int and double are correct. In
+// particular, their memory regions are correct.
+// - TrivialCopyTraits specialization for std::vector<float> is correct. In
+// particular, one can successfully initialize a vector from the properties of
+// another.
+// - A memcpy-able struct "S" can be copied correctly using its TrivialCopyTraits
+// specialization, and the method edm::TrivialCopyTraits<S>::finalize() works
+// correctly.
+// - It can be checked that there is no TrivialCopyTraits specialization for
+// std::map.
+// - A type "S2" whose specialization requires initialization but has no
+// properties can be copied correctly through the TrivialCopyTraits interface.
+// - Several bad TrivialCopyTraits specializations can be detected correctly at
+// compile time.
+//
+
 // --------------------------------------------------------------------------
 // Definitions of various types, and their TrivialCopyTraits specializations
 
@@ -25,27 +47,25 @@ struct S {
 
 template <>
 struct edm::TrivialCopyTraits<S> {
-  using value_type = S;
-
   using Properties = std::array<size_t, 2>;  // {vec.size(), s.size()}
 
-  static Properties properties(value_type const& object) {
+  static Properties properties(S const& object) {
     return std::array<size_t, 2>{{object.vec.size(), object.msg.size()}};
   }
 
-  static void initialize(value_type& object, Properties const& sizes) {
+  static void initialize(S& object, Properties const& sizes) {
     object.vec.resize(sizes.at(0));
     object.msg.resize(sizes.at(1));
   }
 
-  static void finalize(value_type& object) { object.setVecSum(); }
+  static void finalize(S& object) { object.setVecSum(); }
 
-  static std::vector<std::span<std::byte>> regions(value_type& object) {
+  static std::vector<std::span<std::byte>> regions(S& object) {
     return {{reinterpret_cast<std::byte*>(object.msg.data()), object.msg.size()},
             {reinterpret_cast<std::byte*>(object.vec.data()), object.vec.size() * sizeof(float)}};
   }
 
-  static std::vector<std::span<const std::byte>> regions(value_type const& object) {
+  static std::vector<std::span<const std::byte>> regions(S const& object) {
     return {{reinterpret_cast<std::byte const*>(object.msg.data()), object.msg.size()},
             {reinterpret_cast<std::byte const*>(object.vec.data()), object.vec.size() * sizeof(float)}};
   }
@@ -125,7 +145,7 @@ struct edm::TrivialCopyTraits<S5> {
 
 TEST_CASE("test TrivialCopyTraits", "[TrivialCopyTraits]") {
   SECTION("int") {
-    REQUIRE(std::is_same_v<edm::TrivialCopyTraits<int>::value_type, int>);
+    REQUIRE(edm::HasTrivialCopyTraits<int>);
 
     auto checkInt = [](int v) {
       // test non-const regions
@@ -149,7 +169,7 @@ TEST_CASE("test TrivialCopyTraits", "[TrivialCopyTraits]") {
   }
 
   SECTION("double") {
-    REQUIRE(std::is_same_v<edm::TrivialCopyTraits<double>::value_type, double>);
+    REQUIRE(edm::HasTrivialCopyTraits<double>);
 
     auto checkDouble = [](double v) {
       // test non-const regions
@@ -175,8 +195,10 @@ TEST_CASE("test TrivialCopyTraits", "[TrivialCopyTraits]") {
 
   SECTION("std::vector<float>") {
     using VectorType = std::vector<float>;
-    REQUIRE(std::is_same_v<edm::TrivialCopyTraits<VectorType>::value_type, VectorType>);
-    REQUIRE(std::is_same_v<edm::TrivialCopyTraits<VectorType>::Properties, VectorType::size_type>);
+
+    REQUIRE(edm::HasTrivialCopyTraits<VectorType>);
+    REQUIRE(edm::HasTrivialCopyProperties<VectorType>);
+    REQUIRE(edm::HasValidInitialize<VectorType>);
 
     VectorType vec = {-5.5f, -3.3f, -1.1f, 4.4f, 8.8f};
 
@@ -209,10 +231,11 @@ TEST_CASE("test TrivialCopyTraits", "[TrivialCopyTraits]") {
     float test_vec_sum = std::accumulate(test_vec.begin(), test_vec.end(), 0.0f);
 
     // initialize a memcpy-able struct s
-    S s{test_msg, test_vec};
 
-    REQUIRE(std::is_same_v<edm::TrivialCopyTraits<S>::value_type, S>);
-    REQUIRE(std::is_same_v<edm::TrivialCopyTraits<S>::Properties, std::array<size_t, 2>>);
+    REQUIRE(edm::HasTrivialCopyTraits<S>);
+    REQUIRE(edm::HasTrivialCopyProperties<S>);
+    REQUIRE(edm::HasValidInitialize<S>);
+    S s{test_msg, test_vec};
 
     // initialize a clone of s
     S s_clone;
@@ -256,9 +279,9 @@ TEST_CASE("test TrivialCopyTraits", "[TrivialCopyTraits]") {
   }
 
   SECTION("A valid specialization with initialize() but without properties()") {
-    static_assert(edm::HasTrivialCopyTraits<S2>);
-    static_assert(!edm::HasTrivialCopyProperties<S2>);
-    static_assert(edm::HasValidInitialize<S2>);
+    REQUIRE(edm::HasTrivialCopyTraits<S2>);
+    REQUIRE(!edm::HasTrivialCopyProperties<S2>);
+    REQUIRE(edm::HasValidInitialize<S2>);
 
     S2 s2;
     // fill its member vector with some data
