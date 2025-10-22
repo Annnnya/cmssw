@@ -1,9 +1,9 @@
 #ifndef TrivialSerialisation_src_SerialiserFactory_h
 #define TrivialSerialisation_src_SerialiserFactory_h
 
-#include "TrivialSerialisation/Common/interface/SerialiserBase.h"
-#include "TrivialSerialisation/Common/interface/Serialiser.h"
 #include "FWCore/PluginManager/interface/PluginFactory.h"
+#include "TrivialSerialisation/Common/interface/Serialiser.h"
+#include "TrivialSerialisation/Common/interface/SerialiserBase.h"
 
 namespace ngt {
   using SerialiserFactory = edmplugin::PluginFactory<ngt::SerialiserBase*()>;
