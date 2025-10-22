@@ -49,7 +49,9 @@
 #include "FWCore/ParameterSet/interface/ParameterSetDescription.h"
 #include "FWCore/Reflection/interface/ObjectWithDict.h"
 #include "FWCore/Utilities/interface/EDMException.h"
-#include "FWCore/Utilities/interface/TypeDemangler.h"
+
+#include "TrivialSerialisation/Common/interface/SerialiserFactory.h"
+#include "TrivialSerialisation/Common/interface/TrivialSerialiserBase.h"
 
 namespace edmtest {
 
@@ -133,26 +135,32 @@ namespace edmtest {
   void GenericCloner::produce(edm::StreamID /*unused*/, edm::Event& event, edm::EventSetup const& /*unused*/) const {
     for (auto& product : eventProducts_) {
       edm::Handle<edm::WrapperBase> handle(product.objectType_.typeInfo());
+
       event.getByToken(product.getToken_, handle);
+
+      // create a "wrapper", whose wrapped product will be cloned into "clone"
       edm::WrapperBase const* wrapper = handle.product();
+      std::unique_ptr<edm::WrapperBase> clone(static_cast<edm::WrapperBase*>(product.wrappedType_.getClass()->New()));
 
-      std::unique_ptr<edm::WrapperBase> clone(
-          reinterpret_cast<edm::WrapperBase*>(product.wrappedType_.getClass()->New()));
+      // get a "serialiserSource" object from the plugin factory.
+      // serializeSource objects can produce, for a given type, both const and mutable TrivialSerialisers.
+      std::unique_ptr<ngt::SerialiserBase> serialiser{
+          ngt::SerialiserFactory::get()->tryToCreate(product.objectType_.typeInfo().name())};
 
-      if (wrapper->hasTrivialCopyTraits()) {
-        // Use the trivialCopy traits to clone the wrapped object.
+      if (serialiser) {
+        // if a serialiser is found for this type, initialise a const and a mutable TrivialSerialisers.
+        auto reader = serialiser->initialize(*wrapper);
+        auto writer = serialiser->initialize(*clone);
 
-        // mark the clone as present
-        clone->markAsPresent();
-
+        edm::LogInfo("GenericCloner") << "A specialization of TrivialCopyTraits exists for type "
+                                      << product.objectType_.typeInfo().name() << ".";
         // initialise the clone, if the type requires it
-        if (wrapper->hasTrivialCopyProperties()) {
-          clone->trivialCopyInitialize(wrapper->trivialCopyParameters());
-        }
+        writer->initialize(reader->parameters());
 
         // copy the source regions to the target
-        auto sources = wrapper->trivialCopyRegions();
-        auto targets = clone->trivialCopyRegions();
+        auto targets = writer->regions();
+        auto sources = reader->regions();
+
         assert(sources.size() == targets.size());
         for (size_t i = 0; i < sources.size(); ++i) {
           assert(sources[i].data() != nullptr);
@@ -162,8 +170,11 @@ namespace edmtest {
         }
 
         // finalize the clone after the trivialCopy, if the type requires it
-        clone->trivialCopyFinalize();
+        writer->trivialCopyFinalize();
       } else {
+        edm::LogInfo("GenericCloner") << "No specialization of TrivialCopyTraits found for type "
+                                      << product.objectType_.typeInfo().name()
+                                      << ", falling back to the ROOT serialization.";
         // Use ROOT-based serialisation and deserialisation to clone the wrapped object.
 
         // write the wrapper into a TBuffer
