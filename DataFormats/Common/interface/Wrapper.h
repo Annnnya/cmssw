@@ -20,8 +20,6 @@ Wrapper: A template wrapper around EDProducts to hold the product ID.
 #include <algorithm>
 #include <cassert>
 #include <memory>
-#include <span>
-#include <string>
 #include <typeinfo>
 #include <vector>
 
@@ -43,6 +41,9 @@ namespace edm {
     T const* operator->() const { return product(); }
 
     T& bareProduct() { return obj; }
+    T const& bareProduct() const { return obj; }
+
+    void markAsPresent() { present = true; }
 
     //these are used by FWLite
     static std::type_info const& productTypeInfo() { return typeid(T); }
