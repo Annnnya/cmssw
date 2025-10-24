@@ -13,7 +13,7 @@ process.options.numberOfThreads = int(os.environ.get("EXPERIMENT_THREADS", 32))
 process.options.numberOfStreams = int(os.environ.get("EXPERIMENT_STREAMS", 24))
 
 process.options.numberOfConcurrentLuminosityBlocks = 1  # MPIController does not support concurrent lumisections
-process.maxEvents.input = 1000
+process.maxEvents.input = 5
 
 # do not print a final summary
 # process.options.wantSummary = True
