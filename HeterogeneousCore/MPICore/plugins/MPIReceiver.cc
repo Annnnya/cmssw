@@ -22,6 +22,8 @@
 #include "FWCore/ServiceRegistry/interface/Service.h"
 #include "FWCore/ServiceRegistry/interface/ServiceMaker.h"
 #include "FWCore/Utilities/interface/Exception.h"
+// #include "TrivialSerialisation/Common/interface/SerialiserBase.h"
+// #include "TrivialSerialisation/Common/interface/SerialiserFactory.h"
 
 #include <condition_variable>
 #include <mutex>
@@ -113,7 +115,7 @@ public:
 
       else if (product_meta.kind == ProductMetadata::Kind::Serialized) {
         auto productBuffer = TBufferFile(TBuffer::kRead, product_meta.sizeMeta);
-        assert(!wrapper->hasTrivialCopyTraits() && "mismatch between expected and factual metadata type");
+        // assert(!wrapper->hasTrivialCopyTraits() && "mismatch between expected and factual metadata type");
         assert(buffer_offset_ < full_buffer_size && "serialized data buffer is shorter than expected");
         productBuffer.SetBuffer(buf_ptr + buffer_offset_, product_meta.sizeMeta, kFALSE /* adopt = false */);
         buffer_offset_ += product_meta.sizeMeta;
@@ -121,15 +123,25 @@ public:
       }
 
       else if (product_meta.kind == ProductMetadata::Kind::TrivialCopy) {
-        assert(wrapper->hasTrivialCopyTraits() && "mismatch between expected and factual metadata type");
-        wrapper->markAsPresent();
-        edm::AnyBuffer buffer = wrapper->trivialCopyParameters();  // constructs buffer with typeid
+        // assert(wrapper->hasTrivialCopyTraits() && "mismatch between expected and factual metadata type");
+        // wrapper->markAsPresent();
+        // std::unique_ptr<ngt::SerialiserBase> serialiser{
+        //   ngt::SerialiserFactory::get()->tryToCreate(entry.objectType_.typeInfo().name())};
+        std::unique_ptr<ngt::SerialiserBase> serialiser{
+          ngt::SerialiserFactory::get()->tryToCreate(entry.type.typeInfo().name())}; // is this ame correct?
+        if (!serialiser) {
+          throw cms::Exception("SerializerError")
+          << "Receiver could not retrieve its serializer when it was expected";
+        }
+        auto writer = serialiser->initialize(*wrapper);
+        edm::AnyBuffer buffer = writer->parameters();  // constructs buffer with typeid
         assert(buffer.size_bytes() == product_meta.sizeMeta);
         // TDL: can we add func to AnyBuffer to replace pointer to the data?
         std::memcpy(buffer.data(), product_meta.trivialCopyOffset, product_meta.sizeMeta);
-        wrapper->trivialCopyInitialize(buffer);
-        token.channel()->receiveInitializedTrivialCopy(instance_, wrapper.get());
-        wrapper->trivialCopyFinalize();
+        // why both of these methods are called initialize? I find this rather confusing
+        writer->initialize(buffer);
+        token.channel()->receiveInitializedTrivialCopy(instance_, *writer);
+        writer->trivialCopyFinalize();
       }
       // put the data into the Event
       event.put(entry.token, std::move(wrapper));

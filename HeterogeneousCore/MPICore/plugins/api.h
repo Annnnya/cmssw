@@ -12,6 +12,9 @@
 #include "DataFormats/Common/interface/WrapperBase.h"
 #include "DataFormats/Provenance/interface/ProvenanceFwd.h"
 #include "FWCore/Reflection/interface/ObjectWithDict.h"
+#include "TrivialSerialisation/Common/interface/TrivialSerialiser.h"
+#include "TrivialSerialisation/Common/interface/SerialiserBase.h"
+#include "TrivialSerialisation/Common/interface/SerialiserFactory.h"
 
 // local headers
 #include "messages.h"
@@ -116,10 +119,10 @@ public:
   std::unique_ptr<TBufferFile> receiveSerializedBuffer(int instance, int bufSize);
 
   // transfer a wrapped object using its TrivialCopyTraits
-  void sendTrivialCopyProduct(int instance, edm::WrapperBase const* wrapper);
+  void sendTrivialCopyProduct(int instance, const ngt::TrivialSerialiserBase& reader);
 
   // receive into wrapped object
-  void receiveInitializedTrivialCopy(int instance, edm::WrapperBase* wrapper);
+  void receiveInitializedTrivialCopy(int instance, ngt::TrivialSerialiserBase& writer);
 
 private:
   // serialize an EDM object to a simplified representation that can be transmitted as an MPI message

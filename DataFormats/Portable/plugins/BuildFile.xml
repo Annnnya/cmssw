@@ -1,0 +1,12 @@
+<library file="TrivialSerialisationPlugins.cc" name="DataFormatsPortableTrivialSerialisationPlugins">
+  <use name="DataFormats/Common"/>
+  <use name="DataFormats/Portable"/>
+  <use name="DataFormats/EcalDigi"/>
+  <use name="DataFormats/HcalRecHit"/>
+  <use name="DataFormats/ParticleFlowReco"/>
+  <use name="FWCore/Framework"/>
+  <use name="FWCore/PluginManager"/>
+  <use name="TrivialSerialisation/Common"/>
+  <use name="eigen"/>
+  <flags EDM_PLUGIN="1"/>
+</library>

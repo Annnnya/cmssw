@@ -4,7 +4,6 @@
 #include <cassert>
 #include <span>
 #include <type_traits>
-#include <utility>
 #include <vector>
 #include <string>
 

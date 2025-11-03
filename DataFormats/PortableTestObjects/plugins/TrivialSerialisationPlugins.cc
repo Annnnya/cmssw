@@ -1,5 +1,3 @@
-
-
 #include "DataFormats/Portable/interface/PortableHostObject.h"
 #include "DataFormats/Portable/interface/PortableHostCollection.h"
 #include "TrivialSerialisation/Common/interface/SerialiserFactory.h"

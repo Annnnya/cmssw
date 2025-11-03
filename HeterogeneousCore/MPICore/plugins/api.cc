@@ -12,6 +12,7 @@
 #include "DataFormats/Provenance/interface/EventAuxiliary.h"
 #include "DataFormats/Provenance/interface/LuminosityBlockAuxiliary.h"
 #include "DataFormats/Provenance/interface/RunAuxiliary.h"
+#include "TrivialSerialisation/Common/interface/TrivialSerialiser.h"
 
 // local headers
 #include "api.h"
@@ -204,10 +205,10 @@ void MPIChannel::receiveSerializedProduct_(int instance, TClass const* type, voi
   type->Streamer(product, buffer);
 }
 
-void MPIChannel::sendTrivialCopyProduct(int instance, edm::WrapperBase const* wrapper) {
+void MPIChannel::sendTrivialCopyProduct(int instance, const ngt::TrivialSerialiserBase& reader) {
   int tag = EDM_MPI_SendTrivialCopyProduct | instance * EDM_MPI_MessageTagWidth_;
   // transfer the memory regions
-  auto regions = wrapper->trivialCopyRegions();
+  auto regions = reader.regions();
   // TODO send the number of regions ?
   for (size_t i = 0; i < regions.size(); ++i) {
     assert(regions[i].data() != nullptr);
@@ -215,11 +216,11 @@ void MPIChannel::sendTrivialCopyProduct(int instance, edm::WrapperBase const* wr
   }
 }
 
-void MPIChannel::receiveInitializedTrivialCopy(int instance, edm::WrapperBase* wrapper) {
+void MPIChannel::receiveInitializedTrivialCopy(int instance, ngt::TrivialSerialiserBase& writer) {
   int tag = EDM_MPI_SendTrivialCopyProduct | instance * EDM_MPI_MessageTagWidth_;
   MPI_Status status;
   // receive the memory regions
-  auto regions = wrapper->trivialCopyRegions();
+  auto regions = writer.regions();
   // TODO receive and validate the number of regions ?
   for (size_t i = 0; i < regions.size(); ++i) {
     assert(regions[i].data() != nullptr);

@@ -131,8 +131,12 @@ public:
 
       if (handle.isValid()) {
         edm::WrapperBase const* wrapper = handle.product();
-        if (wrapper->hasTrivialCopyTraits()) {
-          edm::AnyBuffer buffer = wrapper->trivialCopyParameters();
+        std::unique_ptr<ngt::SerialiserBase> serialiser{
+          ngt::SerialiserFactory::get()->tryToCreate(entry.type.typeInfo().name())};
+
+        if (serialiser) {
+          auto reader = serialiser->initialize(*wrapper);
+          edm::AnyBuffer buffer = reader->parameters();
           meta->addTrivialCopy(buffer.data(), buffer.size_bytes());
         } else {
           TClass* cls = entry.wrappedType.getClass();
@@ -177,8 +181,11 @@ public:
       edm::WrapperBase const* wrapper = handle.product();
       // we don't send missing products
       if (handle.isValid()) {
-        if (wrapper->hasTrivialCopyTraits()) {
-          token.channel()->sendTrivialCopyProduct(instance_, wrapper);
+        std::unique_ptr<ngt::SerialiserBase> serialiser{
+          ngt::SerialiserFactory::get()->tryToCreate(entry.type.typeInfo().name())};
+        if (serialiser) {
+          auto reader = serialiser->initialize(*wrapper);
+          token.channel()->sendTrivialCopyProduct(instance_, *reader);
         }
       }
     }
