@@ -12,3 +12,12 @@
   <use name="TrivialSerialisation/Common"/>
   <flags EDM_PLUGIN="1"/>
 </library>
+
+<library file="alpaka/*.cc" name="HeterogeneousCoreMPICorePluginsPortable">
+  <use name="alpaka"/>
+  <use name="cuda"/>
+  <use name="HeterogeneousCore/AlpakaCore"/>
+  <use name="HeterogeneousCore/AlpakaInterface"/>
+  <flags ALPAKA_BACKENDS="1"/>
+  <flags EDM_PLUGIN="1"/>
+</library>
