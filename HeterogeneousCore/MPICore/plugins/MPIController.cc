@@ -141,6 +141,7 @@ MPIController::MPIController(edm::ParameterSet const& config)
     throw edm::Exception(edm::errors::Configuration)
         << "Invalid mode \"" << config.getUntrackedParameter<std::string>("mode") << "\"";
   }
+  edm::LogAbsolute("MPI") << "MPIController constructor finished";
 }
 
 MPIController::~MPIController() {
@@ -152,6 +153,7 @@ MPIController::~MPIController() {
 
 void MPIController::beginJob() {
   // signal the connection
+  edm::LogAbsolute("MPI") << "MPIController is signalling the connection...";
   channel_.sendConnect();
 
   /* is there a way to access all known process histories ?

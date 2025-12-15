@@ -146,7 +146,7 @@ MPISource::MPISource(edm::ParameterSet const& config, edm::InputSourceDescriptio
     throw edm::Exception(edm::errors::Configuration)
         << "Invalid mode \"" << config.getUntrackedParameter<std::string>("mode") << "\"";
   }
-
+  edm::LogAbsolute("MPI") << "MPISource is witing for connect message...";
   // Wait for a client to connect.
   MPI_Status status;
   EDM_MPI_Empty_t buffer;
