@@ -72,10 +72,7 @@ private:
       return kInvalid;
   }
 
-  std::vector<MPI_Comm> comms_;         // one communicator per other rank
   std::vector<MPIChannel> channels_;    // one channel per communicator
-  // is it thread safe?
-  size_t next_channel_index_ = 0;
   MPI_Comm comm_world_ = MPI_COMM_NULL;
   edm::EDPutTokenT<MPIToken> token_;
   Mode mode_;
@@ -315,29 +312,30 @@ void MPIController::produce(edm::Event& event, edm::EventSetup const& setup) {
         << "\nprocessGUID " << edm::Guid(event.eventAuxiliary().processGUID(), true).toString();
   }
 
-  // pick communicator in round-robin fashion
   if (channels_.empty()) {
     throw edm::Exception(edm::errors::LogicError)
         << "MPIController: no available channels to send event data!";
   }
 
-  MPIChannel& selected_channel = channels_[next_channel_index_];
-  next_channel_index_ = (next_channel_index_ + 1) % channels_.size();
+  // signal a new event via all channels
+  for (auto& ch : channels_) {
+    ch.sendEvent(event.eventAuxiliary());
+  }
 
-  edm::LogAbsolute("MPI") << "Event " << event.id().event()
-                          << " sent through channel index " << next_channel_index_;
+  // duplicate all MPIChannels and store in the event
+  std::vector<std::shared_ptr<MPIChannel>> duplicated_channels;
+  for (auto& ch : channels_) {
+    duplicated_channels.emplace_back(new MPIChannel(ch.duplicate()), [](MPIChannel* ptr) {
+      ptr->reset();
+      delete ptr;
+    });
+  }
 
-  // signal a new event via this channel
-  selected_channel.sendEvent(event.eventAuxiliary());
+  edm::LogAbsolute("MPI") << "MPIController is emplacing channel of len " << duplicated_channels.size();
 
-  // duplicate the selected MPIChannel and store in the event
-  std::shared_ptr<MPIChannel> link(new MPIChannel(selected_channel.duplicate()), [](MPIChannel* ptr) {
-    ptr->reset();
-    delete ptr;
-  });
-  event.emplace(token_, std::move(link));
+  // put the token into the event
+  event.emplace(token_, std::move(duplicated_channels));
 }
-
 
 void MPIController::fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
   descriptions.setComment(

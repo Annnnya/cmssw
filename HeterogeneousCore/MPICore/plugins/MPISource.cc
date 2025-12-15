@@ -157,27 +157,27 @@ MPISource::MPISource(edm::ParameterSet const& config, edm::InputSourceDescriptio
     throw edm::Exception(edm::errors::Configuration)
         << "Invalid mode \"" << config.getUntrackedParameter<std::string>("mode") << "\"";
   }
-  edm::LogAbsolute("MPI") << "MPISource is witing for connect message...";
-  // Wait for a client to connect.
-  MPI_Status status;
-  EDM_MPI_Empty_t buffer;
-  MPI_Recv(&buffer, 1, EDM_MPI_Empty, MPI_ANY_SOURCE, EDM_MPI_Connect, comm_, &status);
-  edm::LogAbsolute("MPI") << "connected from " << status.MPI_SOURCE;
+  // edm::LogAbsolute("MPI") << "MPISource is witing for connect message...";
+  // // Wait for a client to connect.
+  // MPI_Status status;
+  // EDM_MPI_Empty_t buffer;
+  // MPI_Recv(&buffer, 1, EDM_MPI_Empty, MPI_ANY_SOURCE, EDM_MPI_Connect, comm_, &status);
+  // edm::LogAbsolute("MPI") << "connected from " << status.MPI_SOURCE;
 }
 
 MPISource::~MPISource() {
-  if (mode_ == kIntercommunicator) {
-    // Close the intercommunicator.
-    MPI_Comm_disconnect(&comm_);
+  // if (mode_ == kIntercommunicator) {
+  //   // Close the intercommunicator.
+  //   MPI_Comm_disconnect(&comm_);
 
-    // Unpublish and close the port.
-    MPI_Info port_info;
-    MPI_Info_create(&port_info);
-    MPI_Info_set(port_info, "ompi_global_scope", "true");
-    MPI_Info_set(port_info, "ompi_unique", "true");
-    MPI_Unpublish_name("server", port_info, port_);
-    MPI_Close_port(port_);
-  }
+  //   // Unpublish and close the port.
+  //   MPI_Info port_info;
+  //   MPI_Info_create(&port_info);
+  //   MPI_Info_set(port_info, "ompi_global_scope", "true");
+  //   MPI_Info_set(port_info, "ompi_unique", "true");
+  //   MPI_Unpublish_name("server", port_info, port_);
+  //   MPI_Close_port(port_);
+  // }
 }
 
 //MPISource::ItemTypeInfo MPISource::getNextItemType() {
@@ -316,10 +316,12 @@ bool MPISource::setRunAndEventInfo(edm::EventID& event,
 
 void MPISource::produce(edm::Event& event) {
   // duplicate the MPIChannel and put the copy into the Event
-  std::shared_ptr<MPIChannel> channel(new MPIChannel(channel_.duplicate()), [](MPIChannel* ptr) {
+  std::vector<std::shared_ptr<MPIChannel>> channel;
+  channel.emplace_back(new MPIChannel(channel_.duplicate()), [](MPIChannel* ptr) {
     ptr->reset();
     delete ptr;
   });
+  edm::LogAbsolute("MPI") << "MPISource is emplacing channel of len " << channel.size();
   event.emplace(token_, std::move(channel));
 }
 

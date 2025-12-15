@@ -8,18 +8,18 @@ class MPIChannel;
 
 class MPIToken {
 public:
-  // default constructor, needed to write the type's dictionary
   MPIToken() = default;
 
-  // user-defined constructor
-  explicit MPIToken(std::shared_ptr<MPIChannel> channel) : channel_(channel) {}
+  explicit MPIToken(std::vector<std::shared_ptr<MPIChannel>> channels)
+      : channels_(std::move(channels)) {}
 
-  // access the data member
-  MPIChannel* channel() const { return channel_.get(); }
+  const std::vector<std::shared_ptr<MPIChannel>>& channels() const { return channels_; }
+
+  MPIChannel* channel(size_t i = 0) const { return channels_.at(i).get(); }
 
 private:
-  // wrap the MPI communicator and destination
-  std::shared_ptr<MPIChannel> channel_;
+  std::vector<std::shared_ptr<MPIChannel>> channels_;
 };
+
 
 #endif  // HeterogeneousCore_MPICore_MPIToken_h

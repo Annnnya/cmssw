@@ -19,6 +19,7 @@
 #include "FWCore/Framework/interface/stream/EDProducer.h"
 #include "FWCore/MessageLogger/interface/MessageLogger.h"
 #include "FWCore/ParameterSet/interface/ConfigurationDescriptions.h"
+#include "FWCore/ParameterSet/interface/EmptyGroupDescription.h"
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
 #include "FWCore/ParameterSet/interface/ParameterSetDescription.h"
 #include "FWCore/Reflection/interface/TypeWithDict.h"
@@ -45,6 +46,7 @@ public:
         token_(produces<MPIToken>()),
         patterns_(edm::productPatterns(config.getParameter<std::vector<std::string>>("products"))),
         instance_(config.getParameter<int32_t>("instance")),
+        remote_rank_(config.getUntrackedParameter<int>("remote_rank")),
         buffer_(std::make_unique<TBufferFile>(TBuffer::kWrite)),
         buffer_offset_(0),
         metadata_size_(0) {
@@ -164,7 +166,7 @@ public:
     edm::Service<edm::Async> as;
     as->runAsync(
         std::move(holder),
-        [this, token, meta = std::move(meta)]() { token.channel()->sendMetadata(instance_, meta); },
+        [this, token, meta = std::move(meta)]() { token.channel(remote_rank_)->sendMetadata(instance_, meta); },
         []() { return "Calling MPISender::acquire()"; });
   }
 
@@ -177,7 +179,7 @@ public:
     }
 
     if (has_serialized_) {
-      token.channel()->sendBuffer(buffer_->Buffer(), buffer_->Length(), instance_, EDM_MPI_SendSerializedProduct);
+      token.channel(remote_rank_)->sendBuffer(buffer_->Buffer(), buffer_->Length(), instance_, EDM_MPI_SendSerializedProduct);
     }
 
     for (auto const& entry : products_) {
@@ -190,7 +192,7 @@ public:
             ngt::SerialiserFactory::get()->tryToCreate(entry.type.typeInfo().name());
         if (serialiser) {
           auto reader = serialiser->reader(*wrapper);
-          token.channel()->sendTrivialCopyProduct(instance_, *reader);
+          token.channel(remote_rank_)->sendTrivialCopyProduct(instance_, *reader);
         }
       }
     }
@@ -198,6 +200,21 @@ public:
     // to indicate that they should run after this
     event.emplace(token_, token);
   }
+
+//   static void fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
+//   edm::ParameterSetDescription desc;
+
+//   desc.add<int>("remote_rank", 0);
+
+//   desc.add<unsigned int>("instance", 0);
+
+//   desc.add<std::vector<edm::ParameterSet>>("products", {});
+
+//   desc.add<edm::InputTag>("upstream", edm::InputTag{});
+
+//   descriptions.addWithDefaultLabel(desc);
+// }
+
 
 private:
   size_t serializeAndStoreBuffer_(size_t index, TClass* type, void const* product) {
@@ -220,6 +237,7 @@ private:
   std::vector<edm::ProductNamePattern> patterns_;  // branches to read from the Event and send over the MPI channel
   std::vector<Entry> products_;                    // types and tokens corresponding to the branches
   int32_t const instance_;                         // instance used to identify the source-destination pair
+  int remote_rank_ = 0;
   std::unique_ptr<TBufferFile> buffer_;
   size_t buffer_offset_;
   size_t metadata_size_;

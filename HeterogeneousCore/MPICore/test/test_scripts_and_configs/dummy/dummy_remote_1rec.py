@@ -75,6 +75,7 @@ process.MPIService.pmix_server_uri = "file:server.uri"
 process.remoteDummyReceiver = cms.EDProducer("MPIReceiver",
     upstream=cms.InputTag("source"),
     instance=cms.int32(1),
+    remote_rank=cms.untracked.int32(0),
     products=cms.VPSet(
         cms.PSet(
             type=cms.string("std::vector<double>"),

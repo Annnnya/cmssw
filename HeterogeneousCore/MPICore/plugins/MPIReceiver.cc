@@ -11,6 +11,7 @@
 #include "FWCore/Framework/interface/stream/EDProducer.h"
 #include "FWCore/MessageLogger/interface/MessageLogger.h"
 #include "FWCore/ParameterSet/interface/ConfigurationDescriptions.h"
+#include "FWCore/ParameterSet/interface/EmptyGroupDescription.h"
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
 #include "FWCore/ParameterSet/interface/ParameterSetDescription.h"
 #include "FWCore/ServiceRegistry/interface/Service.h"
@@ -35,7 +36,8 @@ public:
   MPIReceiver(edm::ParameterSet const& config)
       : upstream_(consumes<MPIToken>(config.getParameter<edm::InputTag>("upstream"))),
         token_(produces<MPIToken>()),
-        instance_(config.getParameter<int32_t>("instance"))  //
+        instance_(config.getParameter<int32_t>("instance")),
+        remote_rank_(config.getUntrackedParameter<int>("remote_rank"))
   {
     // instance 0 is reserved for the MPIController / MPISource pair
     // instance values greater than 255 may not fit in the MPI tag
@@ -64,7 +66,7 @@ public:
   void acquire(edm::Event const& event, edm::EventSetup const&, edm::WaitingTaskWithArenaHolder holder) final {
     const MPIToken& token = event.get(upstream_);
 
-    edm::LogAbsolute("MPIReceiver") << "Message was received on process rank " << token.channel()->getMyRank();
+    edm::LogAbsolute("MPIReceiver") << "Message was received on process rank " << token.channel(remote_rank_)->getMyRank();
 
     //also try unique or optional
     received_meta_ = std::make_shared<ProductMetadataBuilder>();
@@ -72,7 +74,7 @@ public:
     edm::Service<edm::Async> as;
     as->runAsync(
         std::move(holder),
-        [this, token]() { token.channel()->receiveMetadata(instance_, received_meta_); },
+        [this, token]() { token.channel(remote_rank_)->receiveMetadata(instance_, received_meta_); },
         []() { return "Calling MPIReceiver::acquire()"; });
   }
 
@@ -95,7 +97,7 @@ public:
     std::unique_ptr<TBufferFile> serialized_buffer;
 
     if (received_meta_->hasSerialized()) {
-      serialized_buffer = token.channel()->receiveSerializedBuffer(instance_, received_meta_->serializedBufferSize());
+      serialized_buffer = token.channel(remote_rank_)->receiveSerializedBuffer(instance_, received_meta_->serializedBufferSize());
       buf_ptr = serialized_buffer->Buffer();
       full_buffer_size = serialized_buffer->BufferSize();
     }
@@ -135,7 +137,7 @@ public:
         std::memcpy(buffer.data(), product_meta.trivialCopyOffset, product_meta.sizeMeta);
         // why both of these methods are called initialize? I find this rather confusing
         writer->initialize(buffer);
-        token.channel()->receiveInitializedTrivialCopy(instance_, *writer);
+        token.channel(remote_rank_)->receiveInitializedTrivialCopy(instance_, *writer);
         writer->finalize();
         // put the data into the Event
         event.put(entry.token, writer->get());
@@ -152,6 +154,22 @@ public:
     event.emplace(token_, token);
   }
 
+//   static void fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
+//   edm::ParameterSetDescription desc;
+
+//   desc.add<int>("remote_rank", 0);
+
+//   desc.add<unsigned int>("instance", 0);
+
+//   desc.add<std::vector<edm::ParameterSet>>("products", {});
+
+//   desc.add<edm::InputTag>("upstream", edm::InputTag{});
+
+//   descriptions.addWithDefaultLabel(desc);
+// }
+
+
+
 private:
   struct Entry {
     edm::TypeWithDict type;
@@ -164,6 +182,7 @@ private:
   edm::EDPutTokenT<MPIToken> const token_;  // copy of the MPIToken that may be used to implement an ordering relation
   std::vector<Entry> products_;             // data to be read over the channel and put into the Event
   int32_t const instance_;                  // instance used to identify the source-destination pair
+  int remote_rank_ = 0;
 
   std::shared_ptr<ProductMetadataBuilder> received_meta_;
 };

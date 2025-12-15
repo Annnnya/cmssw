@@ -85,6 +85,7 @@ process.fixedSizeVectorProducer = cms.EDProducer("edmtest::GlobalVectorProducer"
 process.mpiSender = cms.EDProducer("MPISender",
     upstream=cms.InputTag("mpiController"),
     instance=cms.int32(1),
+    remote_rank=cms.untracked.int32(0),
     products=cms.vstring("*_fixedSizeVectorProducer__*")
 )
 
