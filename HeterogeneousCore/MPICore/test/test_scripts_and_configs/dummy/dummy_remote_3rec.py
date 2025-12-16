@@ -5,14 +5,13 @@ process = cms.Process("DUMMYREMOTE")
 
 # Source: receive from MPI
 process.source = cms.Source("MPISource",
-    run_local=cms.untracked.bool(True),
     firstRun=cms.untracked.uint32(1)
 )
 process.maxEvents = cms.untracked.PSet(input=cms.untracked.int32(-1))
 
 # Concurrency
-process.options.numberOfThreads = int(os.environ.get("EXPERIMENT_THREADS", 2))
-process.options.numberOfStreams = int(os.environ.get("EXPERIMENT_STREAMS", 2))
+process.options.numberOfThreads = int(os.environ.get("EXPERIMENT_THREADS", 4))
+process.options.numberOfStreams = int(os.environ.get("EXPERIMENT_STREAMS", 4))
 process.options.numberOfConcurrentLuminosityBlocks = 1
 process.options.wantSummary = False
 
@@ -56,7 +55,7 @@ process.FastTimerService = cms.Service( "FastTimerService",
 
 process.ThroughputService = cms.Service( "ThroughputService",
     eventRange = cms.untracked.uint32( 10000 ),
-    eventResolution = cms.untracked.uint32( 50 ),
+    eventResolution = cms.untracked.uint32( 1 ),
     printEventSummary = cms.untracked.bool( False ),
     enableDQM = cms.untracked.bool( True ),
     dqmPathByProcesses = cms.untracked.bool( True ),
@@ -76,9 +75,10 @@ process.MPIService.pmix_server_uri = "file:server.uri"
 process.remoteDummyReceiver1 = cms.EDProducer("MPIReceiver",
     upstream=cms.InputTag("source"),
     instance=cms.int32(1),
+    remote_rank=cms.untracked.int32(0),
     products=cms.VPSet(
         cms.PSet(
-            type=cms.string("edm::FixedSizeDummy"),
+            type=cms.string("std::vector<double>"),
             label=cms.string("")
         )
     )
@@ -87,9 +87,10 @@ process.remoteDummyReceiver1 = cms.EDProducer("MPIReceiver",
 process.remoteDummyReceiver2 = cms.EDProducer("MPIReceiver",
     upstream=cms.InputTag("source"),
     instance=cms.int32(2),
+    remote_rank=cms.untracked.int32(0),
     products=cms.VPSet(
         cms.PSet(
-            type=cms.string("edm::FixedSizeDummy"),
+            type=cms.string("std::vector<double>"),
             label=cms.string("")
         )
     )
@@ -98,17 +99,15 @@ process.remoteDummyReceiver2 = cms.EDProducer("MPIReceiver",
 process.remoteDummyReceiver3 = cms.EDProducer("MPIReceiver",
     upstream=cms.InputTag("source"),
     instance=cms.int32(3),
+    remote_rank=cms.untracked.int32(0),
     products=cms.VPSet(
         cms.PSet(
-            type=cms.string("edm::FixedSizeDummy"),
+            type=cms.string("std::vector<double>"),
             label=cms.string("")
         )
     )
 )
 
 # Path
-process.remotePath = cms.Path(
-    process.remoteDummyReceiver1 +
-    process.remoteDummyReceiver2 +
-    process.remoteDummyReceiver3)
+process.remotePath = cms.Path(process.remoteDummyReceiver1 + process.remoteDummyReceiver2 + process.remoteDummyReceiver3)
 process.schedule = cms.Schedule(process.remotePath)

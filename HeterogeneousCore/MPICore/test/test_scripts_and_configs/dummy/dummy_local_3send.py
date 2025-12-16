@@ -5,11 +5,11 @@ process = cms.Process("DUMMYLOCAL")
 
 # Event source: Empty
 process.source = cms.Source("EmptySource")
-process.maxEvents = cms.untracked.PSet(input=cms.untracked.int32(10000))
+process.maxEvents = cms.untracked.PSet(input=cms.untracked.int32(1000))
 
 # Concurrency settings (optional, can use env)
-process.options.numberOfThreads = int(os.environ.get("EXPERIMENT_THREADS", 2))
-process.options.numberOfStreams = int(os.environ.get("EXPERIMENT_STREAMS", 2))
+process.options.numberOfThreads = int(os.environ.get("EXPERIMENT_THREADS", 4))
+process.options.numberOfStreams = int(os.environ.get("EXPERIMENT_STREAMS", 4))
 process.options.numberOfConcurrentLuminosityBlocks = 1
 process.options.wantSummary = False
 
@@ -19,9 +19,12 @@ process.MessageLogger = cms.Service("MessageLogger",
     MPISender=cms.untracked.PSet()
 )
 
+# process.load("FWCore/Services/Tracer_cfi")
+
 # FastTimer output
 experiment_name = os.environ.get("EXPERIMENT_NAME", "unnamed")
 output_dir = os.environ.get("EXPERIMENT_OUTPUT_DIR", "../../test_results/one_time_tests/")
+size_in_bytes = os.environ.get("MESSAGE_SIZE", 1024)
 
 process.FastTimerService = cms.Service( "FastTimerService",
     printEventSummary = cms.untracked.bool( False ),
@@ -53,7 +56,7 @@ process.FastTimerService = cms.Service( "FastTimerService",
 
 process.ThroughputService = cms.Service( "ThroughputService",
     eventRange = cms.untracked.uint32( 10000 ),
-    eventResolution = cms.untracked.uint32( 50 ),
+    eventResolution = cms.untracked.uint32( 1 ),
     printEventSummary = cms.untracked.bool( False ),
     enableDQM = cms.untracked.bool( True ),
     dqmPathByProcesses = cms.untracked.bool( True ),
@@ -72,49 +75,47 @@ process.MPIService.pmix_server_uri = "file:server.uri"
 # Controller
 from HeterogeneousCore.MPICore.mpiController_cfi import mpiController as mpiController_
 process.mpiController = mpiController_.clone()
-process.mpiController.run_local = cms.untracked.bool(True)
 
-# Dummy producer
-process.dummyProducer1 = cms.EDProducer("DummyProducer",
-    sizeInBytes=cms.uint32(1024)
-)
 
-process.dummyProducer2 = cms.EDProducer("DummyProducer",
-    sizeInBytes=cms.uint32(1024)
-)
+doubleValues = [ 0.0 for i in range(size_in_bytes//8) ]
 
-process.dummyProducer3 = cms.EDProducer("DummyProducer",
-    sizeInBytes=cms.uint32(1024)
+process.fixedSizeVectorProducer = cms.EDProducer("edmtest::GlobalVectorProducer",
+    values = cms.vdouble(doubleValues)
 )
 
 # MPI sender
 process.mpiSender1 = cms.EDProducer("MPISender",
     upstream=cms.InputTag("mpiController"),
     instance=cms.int32(1),
-    products=cms.vstring("*_dummyProducer1__*")
+    remote_rank=cms.untracked.int32(0),
+    products=cms.vstring("*_fixedSizeVectorProducer__*")
 )
 
+# MPI sender 2
 process.mpiSender2 = cms.EDProducer("MPISender",
     upstream=cms.InputTag("mpiController"),
-    instance=cms.int32(2),
-    products=cms.vstring("*_dummyProducer2__*")
+    instance=cms.int32(1),
+    remote_rank=cms.untracked.int32(1),
+    products=cms.vstring("*_fixedSizeVectorProducer__*")
 )
 
+# MPI sender 3
 process.mpiSender3 = cms.EDProducer("MPISender",
     upstream=cms.InputTag("mpiController"),
-    instance=cms.int32(3),
-    products=cms.vstring("*_dummyProducer3__*")
+    instance=cms.int32(1),
+    remote_rank=cms.untracked.int32(2),
+    products=cms.vstring("*_fixedSizeVectorProducer__*")
 )
 
 # Path
 process.dummyPath = cms.Path(
     process.mpiController +
-    process.dummyProducer1 +
-    process.dummyProducer2 +
-    process.dummyProducer3 +
+    process.fixedSizeVectorProducer +
     process.mpiSender1 +
     process.mpiSender2 +
     process.mpiSender3
 )
+
+# process.Tracer = cms.Service("Tracer")
 
 process.schedule = cms.Schedule(process.dummyPath)

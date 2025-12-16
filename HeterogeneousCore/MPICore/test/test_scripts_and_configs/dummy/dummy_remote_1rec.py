@@ -15,6 +15,8 @@ process.options.numberOfStreams = int(os.environ.get("EXPERIMENT_STREAMS", 4))
 process.options.numberOfConcurrentLuminosityBlocks = 1
 process.options.wantSummary = False
 
+# process.load("FWCore/Services/Tracer_cfi")
+
 # Logging
 process.MessageLogger = cms.Service("MessageLogger",
     cerr=cms.untracked.PSet(enableStatistics=cms.untracked.bool(False)),
@@ -83,6 +85,8 @@ process.remoteDummyReceiver = cms.EDProducer("MPIReceiver",
         )
     )
 )
+
+# process.Tracer = cms.Service("Tracer")
 
 # Path
 process.remotePath = cms.Path(process.remoteDummyReceiver)
