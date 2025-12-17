@@ -192,6 +192,15 @@ public:
             ngt::SerialiserFactory::get()->tryToCreate(entry.type.typeInfo().name());
         if (serialiser) {
           auto reader = serialiser->reader(*wrapper);
+
+
+          auto const* f =
+              reinterpret_cast<double const*>(reader->regions()[0].data());
+
+          double value = f[0];
+
+          edm::LogAbsolute("MPISender") << "Sending data on process rank " << remote_rank_ << " is: " << std::fixed << std::setprecision(6) << value;
+          
           token.channel(remote_rank_)->sendTrivialCopyProduct(instance_, *reader);
         }
       }

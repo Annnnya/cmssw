@@ -25,6 +25,7 @@
 #include <condition_variable>
 #include <mutex>
 #include <cassert>
+#include <iomanip>
 
 // local include files
 #include "api.h"
@@ -139,6 +140,9 @@ public:
         writer->initialize(buffer);
         token.channel(remote_rank_)->receiveInitializedTrivialCopy(instance_, *writer);
         writer->finalize();
+        auto* f = reinterpret_cast<double*>(writer->regions()[0].data());
+        double value = f[0];
+        edm::LogAbsolute("MPIReceiver") << "Data received on process rank " << token.channel(remote_rank_)->getMyRank() << " is: " << std::fixed << std::setprecision(6) << value;
         // put the data into the Event
         event.put(entry.token, writer->get());
       }

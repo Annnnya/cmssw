@@ -1,6 +1,7 @@
 #include <iostream>
 #include <memory>
 #include <sstream>
+#include <cassert>
 
 #include <mpi.h>
 
@@ -119,7 +120,9 @@ MPIController::MPIController(edm::ParameterSet const& config)
 
     for (int other = 0; other < world_size; ++other) {
       if (other == world_rank) continue;
-      if (!all_is_remote[other]) continue;
+      // if (!all_is_remote[other]) continue;
+
+      assert(all_is_remote[other] && "Currently only one MPIController is supported");
 
       // first source rank, then rank of this process (controller)
       int ranks[2] = {other, world_rank};

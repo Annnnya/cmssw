@@ -77,18 +77,31 @@ from HeterogeneousCore.MPICore.mpiController_cfi import mpiController as mpiCont
 process.mpiController = mpiController_.clone()
 
 
-doubleValues = [ 0.0 for i in range(size_in_bytes//8) ]
+doubleValues0 = [ 0.0 for i in range(size_in_bytes//8) ]
 
-process.fixedSizeVectorProducer = cms.EDProducer("edmtest::GlobalVectorProducer",
-    values = cms.vdouble(doubleValues)
+process.fixedSizeVectorProducer1 = cms.EDProducer("edmtest::GlobalVectorProducer",
+    values = cms.vdouble(doubleValues0)
 )
+
+doubleValues1 = [ 1.0 for i in range(size_in_bytes//8) ]
+
+process.fixedSizeVectorProducer2 = cms.EDProducer("edmtest::GlobalVectorProducer",
+    values = cms.vdouble(doubleValues1)
+)
+
+doubleValues2 = [ 2.0 for i in range(size_in_bytes//8) ]
+
+process.fixedSizeVectorProducer3 = cms.EDProducer("edmtest::GlobalVectorProducer",
+    values = cms.vdouble(doubleValues2)
+)
+
 
 # MPI sender
 process.mpiSender1 = cms.EDProducer("MPISender",
     upstream=cms.InputTag("mpiController"),
     instance=cms.int32(1),
     remote_rank=cms.untracked.int32(0),
-    products=cms.vstring("*_fixedSizeVectorProducer__*")
+    products=cms.vstring("*_fixedSizeVectorProducer1__*")
 )
 
 # MPI sender 2
@@ -96,7 +109,7 @@ process.mpiSender2 = cms.EDProducer("MPISender",
     upstream=cms.InputTag("mpiController"),
     instance=cms.int32(1),
     remote_rank=cms.untracked.int32(1),
-    products=cms.vstring("*_fixedSizeVectorProducer__*")
+    products=cms.vstring("*_fixedSizeVectorProducer2__*")
 )
 
 # MPI sender 3
@@ -104,13 +117,15 @@ process.mpiSender3 = cms.EDProducer("MPISender",
     upstream=cms.InputTag("mpiController"),
     instance=cms.int32(1),
     remote_rank=cms.untracked.int32(2),
-    products=cms.vstring("*_fixedSizeVectorProducer__*")
+    products=cms.vstring("*_fixedSizeVectorProducer3__*")
 )
 
 # Path
 process.dummyPath = cms.Path(
     process.mpiController +
-    process.fixedSizeVectorProducer +
+    process.fixedSizeVectorProducer1 +
+    process.fixedSizeVectorProducer2 +
+    process.fixedSizeVectorProducer3 +
     process.mpiSender1 +
     process.mpiSender2 +
     process.mpiSender3
