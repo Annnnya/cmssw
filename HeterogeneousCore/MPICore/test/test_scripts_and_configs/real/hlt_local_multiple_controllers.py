@@ -13,14 +13,14 @@ process.options.numberOfThreads = int(os.environ.get("EXPERIMENT_THREADS", 32))
 process.options.numberOfStreams = int(os.environ.get("EXPERIMENT_STREAMS", 24))
 
 process.options.numberOfConcurrentLuminosityBlocks = 1  # MPIController does not support concurrent lumisections
-process.maxEvents.input = 5
+process.maxEvents.input = 1000
 
 # do not print a final summary
 # process.options.wantSummary = True
 # process.MessageLogger.cerr.enableStatistics = cms.untracked.bool(False)
 
 # process.writeResults = cms.OutputModule( "PoolOutputModule",
-#     fileName = cms.untracked.string( "results2.root" ),
+#     fileName = cms.untracked.string( "results_mc.root" ),
 #     compressionAlgorithm = cms.untracked.string( "ZSTD" ),
 #     compressionLevel = cms.untracked.int32( 3 ),
 #     outputCommands = cms.untracked.vstring( 'keep edmTriggerResults_*_*_*' )
@@ -47,13 +47,37 @@ process.load("HeterogeneousCore.MPIServices.MPIService_cfi")
 process.MPIService.pmix_server_uri = "file:server.uri"
 
 from HeterogeneousCore.MPICore.mpiController_cfi import mpiController as mpiController_
-process.mpiController = mpiController_.clone()
+
+process.mpiController0 = mpiController_.clone(
+    remote_process_rank = 0
+)
+
+process.mpiController1 = mpiController_.clone(
+    remote_process_rank = 1
+)
+
+process.mpiController2 = mpiController_.clone(
+    remote_process_rank = 2
+)
+
 
 # process.load("FWCore/Services/Tracer_cfi")
 
 # send the raw data over MPI
-process.mpiSenderRawData = cms.EDProducer("MPISender",
-    upstream = cms.InputTag("mpiController"),
+process.mpiSenderRawData0 = cms.EDProducer("MPISender",
+    upstream = cms.InputTag("mpiController0"),
+    instance = cms.int32(1),
+    products = cms.vstring("rawDataCollector", "rawDataCollectorActivity")
+)
+
+process.mpiSenderRawData1 = cms.EDProducer("MPISender",
+    upstream = cms.InputTag("mpiController1"),
+    instance = cms.int32(1),
+    products = cms.vstring("rawDataCollector", "rawDataCollectorActivity")
+)
+
+process.mpiSenderRawData2 = cms.EDProducer("MPISender",
+    upstream = cms.InputTag("mpiController2"),
     instance = cms.int32(1),
     products = cms.vstring("rawDataCollector", "rawDataCollectorActivity")
 )
@@ -69,7 +93,7 @@ del process.hltEcalDigisSoA
 
 # receive the ECAL digis SoA over MPI
 process.hltEcalDigisSoA = cms.EDProducer("MPIReceiver",
-    upstream = cms.InputTag("mpiSenderRawData"),
+    upstream = cms.InputTag("mpiSenderRawData1"),
     instance = cms.int32(20),
     products = cms.VPSet(cms.PSet(
         type = cms.string("PortableHostCollection<EcalDigiSoALayout<128,false> >"),
@@ -124,7 +148,7 @@ del process.hltHbheRecoSoA
 
 # receive the HBHE rechits SoA over MPI
 process.hltHbheRecoSoA = cms.EDProducer("MPIReceiver",
-    upstream = cms.InputTag("mpiSenderRawData"),
+    upstream = cms.InputTag("mpiSenderRawData0"),
     instance = cms.int32(11),
     products = cms.VPSet(cms.PSet(
         type = cms.string("PortableHostCollection<hcal::HcalRecHitSoALayout<128,false> >"),
@@ -193,7 +217,7 @@ del process.hltSiPixelClustersSoA
 
 # receive the SiPixelClustersSoA over MPI
 process.hltSiPixelClustersSoA = cms.EDProducer("MPIReceiver",
-    upstream = cms.InputTag("mpiSenderRawData"),
+    upstream = cms.InputTag("mpiSenderRawData2"),
     instance = cms.int32(32),
     products = cms.VPSet(
     cms.PSet(
@@ -309,20 +333,20 @@ process.HLTDoLocalPixelSequence.insert(0, process.rawDataCollectorActivity) # pi
 process.HLTDoLocalPixelSequence.insert(1, process.PixelActivity)
 
 process.mpiSenderEcalDigisAndRecoActivity = cms.EDProducer("MPISender",
-    upstream = cms.InputTag("mpiController"),
+    upstream = cms.InputTag("mpiController1"),
     instance = cms.int32(2),
     products = cms.vstring("EcalDigisAndRecoActivity")
 )
 
 
 process.mpiSenderhltHbheRecoSoAAParticleFlowActivity = cms.EDProducer("MPISender",
-    upstream = cms.InputTag("mpiController"),
+    upstream = cms.InputTag("mpiController0"),
     instance = cms.int32(3),
     products = cms.vstring("hltHbheRecoSoAAParticleFlowActivity")
 )
 
 process.mpiSenderPixelActivity = cms.EDProducer("MPISender",
-    upstream = cms.InputTag("mpiController"),
+    upstream = cms.InputTag("mpiController2"),
     instance = cms.int32(4),
     products = cms.vstring("PixelActivity")
 )
@@ -330,8 +354,12 @@ process.mpiSenderPixelActivity = cms.EDProducer("MPISender",
 
 # schedule the communication for every event
 process.Offload = cms.Path(
-    process.mpiController +
-    process.mpiSenderRawData +
+    process.mpiController0 +
+    process.mpiController1 +
+    process.mpiController2 +
+    process.mpiSenderRawData0 +
+    process.mpiSenderRawData1 +
+    process.mpiSenderRawData2 +
     process.mpiSenderEcalDigisAndRecoActivity +
     process.mpiSenderhltHbheRecoSoAAParticleFlowActivity +
     process.mpiSenderPixelActivity +

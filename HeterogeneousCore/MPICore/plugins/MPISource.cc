@@ -87,68 +87,55 @@ MPISource::MPISource(edm::ParameterSet const& config, edm::InputSourceDescriptio
   EDM_MPI_build_types();
 
   if (mode_ == kCommWorld) {
-    edm::LogAbsolute("MPI") << "MPISource in " << ModeDescription[mode_] << " mode.";
 
     int world_size, world_rank;
     MPI_Comm_size(MPI_COMM_WORLD, &world_size);
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
 
+    int controllers_rank_ = world_size - 1;
+
+    edm::LogAbsolute("MPI") << "MPISource in " << ModeDescription[mode_] << " mode --- remote rank: " << world_rank << " controller rank: " << controllers_rank_;
+
     MPI_Group world_group;
     MPI_Comm_group(MPI_COMM_WORLD, &world_group);
 
-    // exchange remote flags with all ranks
-    int is_remote = 1; // mark ourselves as remote
-    std::vector<int> all_is_remote(world_size, 0);
-    MPI_Allgather(&is_remote, 1, MPI_INT,
-                  all_is_remote.data(), 1, MPI_INT,
-                  MPI_COMM_WORLD);
+    int is_remote_ = 1;
+    int is_local_ = 0;
+    MPI_Status status;
 
-    // identify the "local" rank (the controller)
-    int local_rank = -1;
-    for (int i = 0; i < world_size; ++i) {
-      if (all_is_remote[i] == 0) { // only one local is expected
-        local_rank = i;
-        break;
-      }
-    }
+    MPI_Sendrecv(&is_remote_, 1, MPI_INT, controllers_rank_, EDM_MPI_RemoteVerify,
+      &is_local_, 1, MPI_INT, controllers_rank_, EDM_MPI_LocalVerify,
+      MPI_COMM_WORLD, &status);
 
-    if (local_rank < 0) {
-      throw edm::Exception(edm::errors::LogicError)
-          << "MPISource could not find any local controller rank in MPI_COMM_WORLD.";
-    }
 
-    // edm::LogAbsolute("MPI") << "Rank " << world_rank << " identified controller rank " << local_rank;
+    assert(is_local_==1 && 
+      "Local verification did not pass. Plaese check that processes are launched at the correct order and match the ranks expected in config");
 
     // create a communicator only between this remote and the local rank
-    for (int remote_rank = 0; remote_rank < world_size; ++remote_rank) {
-      if (remote_rank == local_rank) continue;
-      // first rank of this process, then controller rank
-      int ranks[2] = {remote_rank, local_rank};
-      edm::LogAbsolute("MPI") << "From remote " << world_rank << " pair " << remote_rank << ' ' << local_rank;
-      MPI_Group pair_group;
-      MPI_Comm pair_comm;
-      MPI_Group_incl(world_group, 2, ranks, &pair_group);
-      MPI_Comm_create_group(MPI_COMM_WORLD, pair_group, 0, &pair_comm);
+    // first rank of this process, then controller rank
+    int ranks[2] = {world_rank, controllers_rank_};
+    edm::LogAbsolute("MPI") << "From remote " << world_rank << " pair " << world_rank << ' ' << controllers_rank_;
+    MPI_Group pair_group;
+    MPI_Group_incl(world_group, 2, ranks, &pair_group);
+    MPI_Comm_create_group(MPI_COMM_WORLD, pair_group, 0, &comm_);
 
-      if (pair_comm != MPI_COMM_NULL) {
-        edm::LogAbsolute("MPI") << "Remote " << world_rank << " assigned nonzero comm for " << remote_rank; 
-        comm_ = pair_comm;
-        channel_ = MPIChannel(comm_, 1, world_rank);
-      }
-
-      MPI_Group_free(&pair_group);
-
-      edm::LogAbsolute("MPI") << "From remote: Created communicator between remote rank " << remote_rank
-                              << " and local rank " << local_rank;
+    if (comm_ != MPI_COMM_NULL) {
+      edm::LogAbsolute("MPI") << "Remote " << world_rank << " assigned nonzero comm for " << world_rank; 
+      channel_ = MPIChannel(comm_, 1, world_rank);
     }
+
+    MPI_Group_free(&pair_group);
+
+    edm::LogAbsolute("MPI") << "From remote: Created communicator between remote rank " << world_rank
+                            << " and local rank " << controllers_rank_;
     MPI_Group_free(&world_group);
 
     // Wait for connection from controller
-  MPI_Status status;
-  EDM_MPI_Empty_t buffer;
-  edm::LogAbsolute("MPI") << "receiving connect from " << world_rank << " from local " << local_rank;
-  MPI_Recv(&buffer, 1, EDM_MPI_Empty, 1, EDM_MPI_Connect, comm_, &status);
-  edm::LogAbsolute("MPI") << "Connected to controller rank " << status.MPI_SOURCE;
+    // MPI_Status status;
+    EDM_MPI_Empty_t buffer;
+    edm::LogAbsolute("MPI") << "receiving connect from " << world_rank << " from local " << controllers_rank_;
+    MPI_Recv(&buffer, 1, EDM_MPI_Empty, 1, EDM_MPI_Connect, comm_, &status);
+    edm::LogAbsolute("MPI") << "Connected to controller rank " << status.MPI_SOURCE;
 
   } else if (mode_ == kIntercommunicator) {
     throw edm::Exception(edm::errors::Configuration)
@@ -157,6 +144,7 @@ MPISource::MPISource(edm::ParameterSet const& config, edm::InputSourceDescriptio
     throw edm::Exception(edm::errors::Configuration)
         << "Invalid mode \"" << config.getUntrackedParameter<std::string>("mode") << "\"";
   }
+
 }
 
 MPISource::~MPISource() {

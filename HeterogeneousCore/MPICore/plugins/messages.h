@@ -25,7 +25,9 @@ enum EDM_MPI_MessageTag {
   EDM_MPI_SendSerializedProduct,
   EDM_MPI_SendTrivialProduct,
   EDM_MPI_SendTrivialCopyProduct,
-  EDM_MPI_MessageTagCount_
+  EDM_MPI_MessageTagCount_,
+  EDM_MPI_LocalVerify,
+  EDM_MPI_RemoteVerify
 };
 
 /* Ensure that the MPI message tags can fit in a single byte
