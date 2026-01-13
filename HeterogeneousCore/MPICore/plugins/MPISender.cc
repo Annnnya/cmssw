@@ -104,13 +104,19 @@ public:
     // TODO add an error if a pattern does not match any branches? how?
   }
 
+
+
+
   void acquire(edm::Event const& event, edm::EventSetup const&, edm::WaitingTaskWithArenaHolder holder) final {
+
     const MPIToken& token = event.get(upstream_);
     // we need 1 byte for type, 8 bytes for size and at least 8 bytes for trivial copy parameters buffer
     auto meta = std::make_shared<ProductMetadataBuilder>(products_.size() * 24);
     size_t index = 0;
     // this seems to work fine, but does this vector indeed persist between acquire() and produce()?
     // serializedBuffers_.clear();
+    // edm::LogAbsolute("MPI") << "Entering send aquire of module " << this->moduleDescription().moduleLabel() << " at rank"  << token.channel()->getMyRank(); 
+
     buffer_->Reset();
     buffer_offset_ = 0;
     meta->setProductCount(products_.size());
@@ -166,10 +172,15 @@ public:
         std::move(holder),
         [this, token, meta = std::move(meta)]() { token.channel()->sendMetadata(instance_, meta); },
         []() { return "Calling MPISender::acquire()"; });
+    // edm::LogAbsolute("MPI") << "Finished aquire of module " << this->moduleDescription().moduleLabel() << " at rank"  << token.channel()->getMyRank(); 
+    
   }
 
   void produce(edm::Event& event, edm::EventSetup const&) final {
     MPIToken token = event.get(upstream_);
+
+    // edm::LogAbsolute("MPI") << "Entering send produce of module " << this->moduleDescription().moduleLabel() << " at rank"  << token.channel()->getMyRank(); 
+
 
     if (!is_active_) {
       event.emplace(token_, token);
@@ -194,6 +205,9 @@ public:
         }
       }
     }
+
+    // edm::LogAbsolute("MPI") << "Finished send produce of module " << this->moduleDescription().moduleLabel() << " at rank"  << token.channel()->getMyRank(); 
+
     // write a shallow copy of the channel to the output, so other modules can consume it
     // to indicate that they should run after this
     event.emplace(token_, token);

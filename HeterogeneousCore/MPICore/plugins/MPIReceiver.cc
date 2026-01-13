@@ -64,6 +64,9 @@ public:
   void acquire(edm::Event const& event, edm::EventSetup const&, edm::WaitingTaskWithArenaHolder holder) final {
     const MPIToken& token = event.get(upstream_);
 
+    // edm::LogAbsolute("MPI") << "Entering receive aquire of module " << this->moduleDescription().moduleLabel() << " at rank"  << token.channel()->getMyRank(); 
+
+
     // edm::LogAbsolute("MPIReceiver") << "Message was received on process rank " << token.channel()->getMyRank();
 
     //also try unique or optional
@@ -74,11 +77,16 @@ public:
         std::move(holder),
         [this, token]() { token.channel()->receiveMetadata(instance_, received_meta_); },
         []() { return "Calling MPIReceiver::acquire()"; });
+
+    // edm::LogAbsolute("MPI") << "Finished receive aquire of module " << this->moduleDescription().moduleLabel() << " at rank"  << token.channel()->getMyRank(); 
+    
   }
 
   void produce(edm::Event& event, edm::EventSetup const&) final {
     // read the MPIToken used to establish the communication channel
     MPIToken token = event.get(upstream_);
+    // edm::LogAbsolute("MPI") << "Entering receive produce of module " << this->moduleDescription().moduleLabel() << " at rank"  << token.channel()->getMyRank(); 
+
     // see the summary of metadata for dubug purposes
     // received_meta_->debugPrintMetadataSummary();
 
@@ -149,6 +157,8 @@ public:
 
     // write a shallow copy of the channel to the output, so other modules can consume it
     // to indicate that they should run after this
+    // edm::LogAbsolute("MPI") << "Finished receive produce of module " << this->moduleDescription().moduleLabel() << " at rank"  << token.channel()->getMyRank(); 
+
     event.emplace(token_, token);
   }
 
