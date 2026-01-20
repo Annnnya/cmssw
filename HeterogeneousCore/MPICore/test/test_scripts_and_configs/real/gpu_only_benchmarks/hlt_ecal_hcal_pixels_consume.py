@@ -36,7 +36,7 @@ process.options.numberOfConcurrentLuminosityBlocks = 1
 
 # process.FastTimerService = _process.FastTimerService.clone()
 # process.FastTimerService.writeJSONSummary = True
-# process.FastTimerService.jsonFileName=cms.untracked.string(f"../../../test_results/results.json")
+# process.FastTimerService.jsonFileName=cms.untracked.string(f"../../../test_results/results_consume.json")
 
 process.ThroughputService = cms.Service('ThroughputService',
     enableDQM = cms.untracked.bool(False),
@@ -73,7 +73,7 @@ process.Status_OnGPU = cms.Path( process.hltBackend + process.hltStatusOnGPUFilt
 process.DQMStore = _process.DQMStore.clone()
 process.EvFDaqDirector = _process.EvFDaqDirector.clone()
 process.source = _process.source.clone()
-process.maxEvents.input = 10000
+process.maxEvents.input = 1000
 
 # HBHE local reconstruction from the HLT menu
 process.hltHcalDigis = _process.hltHcalDigis.clone()
@@ -83,6 +83,19 @@ process.hltHbheRecoSoA = _process.hltHbheRecoSoA.clone()
 process.hltParticleFlowRecHitHBHESoA = _process.hltParticleFlowRecHitHBHESoA.clone()
 process.hltParticleFlowClusterHBHESoA = _process.hltParticleFlowClusterHBHESoA.clone()
 
+process.dummyHcalConsume1 = cms.EDAnalyzer("GenericConsumer",
+    eventProducts = cms.untracked.vstring( "hltHbheRecoSoA" )
+)
+
+process.dummyHcalConsume2 = cms.EDAnalyzer("GenericConsumer",
+    eventProducts = cms.untracked.vstring( "hltParticleFlowRecHitHBHESoA" )
+)
+
+process.dummyHcalConsume3 = cms.EDAnalyzer("GenericConsumer",
+    eventProducts = cms.untracked.vstring( "hltParticleFlowClusterHBHESoA" )
+)
+
+
 # run the HBHE local reconstruction
 process.HLTLocalHBHE = cms.Path(
     process.hltGetRaw +
@@ -90,7 +103,10 @@ process.HLTLocalHBHE = cms.Path(
     process.hltHcalDigisSoA +
     process.hltHbheRecoSoA +
     process.hltParticleFlowRecHitHBHESoA +
-    process.hltParticleFlowClusterHBHESoA
+    process.hltParticleFlowClusterHBHESoA +
+    process.dummyHcalConsume1 +
+    process.dummyHcalConsume2 +
+    process.dummyHcalConsume3
 )
 
 # ECAL local reconstruction from the HLT menu
@@ -101,17 +117,24 @@ process.hltEcalUncalibRecHitSoA = _process.hltEcalUncalibRecHitSoA.clone()
 # 1) via explicit alpaka parameter 
 # 2) or by adding dummy consumer at the end of the ECAL sequence
 
-process.hltEcalUncalibRecHitSoA.alpaka.synchronize = cms.untracked.bool(True)
-# process.dummyEcalConsume = cms.EDAnalyzer("GenericConsumer",
-#     eventProducts = cms.untracked.vstring( "hltEcalUncalibRecHitSoA" )
-# )
+# process.hltEcalUncalibRecHitSoA.alpaka.synchronize = cms.untracked.bool(True)
+
+process.dummyEcalConsume1 = cms.EDAnalyzer("GenericConsumer",
+    eventProducts = cms.untracked.vstring( "hltEcalDigisSoA" )
+)
+
+process.dummyEcalConsume2 = cms.EDAnalyzer("GenericConsumer",
+    eventProducts = cms.untracked.vstring( "hltEcalUncalibRecHitSoA" )
+)
 
 
 # run the ECAL local reconstruction
 process.HLTLocalECAL = cms.Path(
     process.hltGetRaw +
     process.hltEcalDigisSoA +
-    process.hltEcalUncalibRecHitSoA
+    process.hltEcalUncalibRecHitSoA +
+    process.dummyEcalConsume1 +
+    process.dummyEcalConsume2
 )
 
 # Pixel local reconstruction from the HLT menu
@@ -122,6 +145,22 @@ process.hltSiPixelRecHitsSoA = _process.hltSiPixelRecHitsSoA.clone()
 process.hltPixelTracksSoA = _process.hltPixelTracksSoA.clone()
 process.hltPixelVerticesSoA = _process.hltPixelVerticesSoA.clone()
 
+process.dummyPixelConsume1 = cms.EDAnalyzer("GenericConsumer",
+    eventProducts = cms.untracked.vstring( "hltSiPixelClustersSoA" )
+)
+
+process.dummyPixelConsume2 = cms.EDAnalyzer("GenericConsumer",
+    eventProducts = cms.untracked.vstring( "hltSiPixelRecHitsSoA" )
+)
+
+process.dummyPixelConsume3 = cms.EDAnalyzer("GenericConsumer",
+    eventProducts = cms.untracked.vstring( "hltPixelTracksSoA" )
+)
+
+process.dummyPixelConsume4 = cms.EDAnalyzer("GenericConsumer",
+    eventProducts = cms.untracked.vstring( "hltPixelVerticesSoA" )
+)
+
 
 process.HLTLocalPixel = cms.Path(
     process.hltGetRaw +
@@ -130,7 +169,11 @@ process.HLTLocalPixel = cms.Path(
     process.hltSiPixelClustersSoA +
     process.hltSiPixelRecHitsSoA +
     process.hltPixelTracksSoA +
-    process.hltPixelVerticesSoA 
+    process.hltPixelVerticesSoA +
+    process.dummyPixelConsume1 +
+    process.dummyPixelConsume2 +
+    process.dummyPixelConsume3 +
+    process.dummyPixelConsume4
 )
 
 # schedule the reconstruction

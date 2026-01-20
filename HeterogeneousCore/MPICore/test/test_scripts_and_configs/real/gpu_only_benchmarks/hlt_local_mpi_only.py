@@ -30,15 +30,29 @@ process.options.numberOfConcurrentLuminosityBlocks = 1
 
 
 # FastTimer output
-experiment_name = os.environ.get("EXPERIMENT_NAME", "unnamed")
-output_dir = os.environ.get("EXPERIMENT_OUTPUT_DIR", "../../test_results/one_time_tests/")
+# experiment_name = os.environ.get("EXPERIMENT_NAME", "unnamed")
+# output_dir = os.environ.get("EXPERIMENT_OUTPUT_DIR", "../../test_results/one_time_tests/")
 
 
+# process.FastTimerService = _process.FastTimerService.clone()
+# process.FastTimerService.writeJSONSummary = True
+# process.FastTimerService.jsonFileName=cms.untracked.string(f"{output_dir}/remote_{experiment_name}.json")
 process.FastTimerService = _process.FastTimerService.clone()
 process.FastTimerService.writeJSONSummary = True
-process.FastTimerService.jsonFileName=cms.untracked.string(f"{output_dir}/remote_{experiment_name}.json")
+process.FastTimerService.jsonFileName=cms.untracked.string(f"../../../test_results/results_mpio1.json")
 
-process.ThroughputService = _process.ThroughputService.clone()
+process.ThroughputService = cms.Service('ThroughputService',
+    enableDQM = cms.untracked.bool(False),
+    printEventSummary = cms.untracked.bool(True),
+    eventResolution = cms.untracked.uint32(10),
+    eventRange = cms.untracked.uint32(10300),
+)
+
+process.MessageLogger.cerr.ThroughputService = cms.untracked.PSet(
+    limit = cms.untracked.int32(10000000),
+    reportEvery = cms.untracked.int32(1)
+)
+
 # process.ThroughputService.printEventSummary = True
 # process.load("FWCore/Services/Tracer_cfi")
 
