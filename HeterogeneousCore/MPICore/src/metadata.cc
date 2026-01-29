@@ -23,25 +23,74 @@ ProductMetadataBuilder::ProductMetadataBuilder(int16_t productCount)
 
 ProductMetadataBuilder::~ProductMetadataBuilder() { std::free(buffer_); }
 
+// Move costructors
+
 ProductMetadataBuilder::ProductMetadataBuilder(ProductMetadataBuilder&& other) noexcept
-    : buffer_(other.buffer_), capacity_(other.capacity_), size_(other.size_), readOffset_(other.readOffset_) {
+    : buffer_(other.buffer_),
+      capacity_(other.capacity_),
+      size_(other.size_),
+      readOffset_(other.readOffset_),
+      header_(other.header_) {
   other.buffer_ = nullptr;
   other.capacity_ = 0;
   other.size_ = 0;
   other.readOffset_ = 0;
+  other.header_ = MetadataHeader{};
 }
 
 ProductMetadataBuilder& ProductMetadataBuilder::operator=(ProductMetadataBuilder&& other) noexcept {
   if (this != &other) {
     std::free(buffer_);
+
     buffer_ = other.buffer_;
     capacity_ = other.capacity_;
     size_ = other.size_;
     readOffset_ = other.readOffset_;
+    header_ = other.header_;
+
     other.buffer_ = nullptr;
     other.capacity_ = 0;
     other.size_ = 0;
     other.readOffset_ = 0;
+    other.header_ = MetadataHeader{};
+  }
+  return *this;
+}
+
+// Copy constructors
+
+ProductMetadataBuilder::ProductMetadataBuilder(const ProductMetadataBuilder& other)
+    : buffer_(nullptr),
+      capacity_(other.capacity_),
+      size_(other.size_),
+      readOffset_(other.readOffset_),
+      header_(other.header_) {
+  if (capacity_ > 0) {
+    buffer_ = static_cast<uint8_t*>(std::malloc(capacity_));
+    if (!buffer_)
+      throw std::bad_alloc();
+    std::memcpy(buffer_, other.buffer_, size_);
+  }
+}
+
+ProductMetadataBuilder& ProductMetadataBuilder::operator=(const ProductMetadataBuilder& other) {
+  if (this != &other) {
+    uint8_t* newBuffer = nullptr;
+
+    if (other.capacity_ > 0) {
+      newBuffer = static_cast<uint8_t*>(std::malloc(other.capacity_));
+      if (!newBuffer)
+        throw std::bad_alloc();
+      std::memcpy(newBuffer, other.buffer_, other.size_);
+    }
+
+    std::free(buffer_);
+
+    buffer_ = newBuffer;
+    capacity_ = other.capacity_;
+    size_ = other.size_;
+    readOffset_ = other.readOffset_;
+    header_ = other.header_;
   }
   return *this;
 }
@@ -157,110 +206,61 @@ void ProductMetadataBuilder::appendBytes(const std::byte* src, size_t size) {
 }
 
 void ProductMetadataBuilder::debugPrintMetadataSummary() const {
-  if (size_ < sizeof(MetadataHeader)) {
+  if (size_ < headerSize_) {
     std::cerr << "ERROR: Buffer too small to contain metadata header\n";
     return;
   }
 
   std::ostringstream out;
 
-  // --- Read header fields explicitly (must match setHeader layout) ---
-  int16_t productCount = 0;
-  uint8_t productFlags = 0;
-  int32_t serializedBufferSize = 0;
-
-  size_t offset = 0;
-  std::memcpy(&productCount, buffer_ + offset, sizeof(int16_t));
-  offset += sizeof(int16_t);
-
-  productFlags = buffer_[offset];
-  offset += sizeof(uint8_t);
-
-  std::memcpy(&serializedBufferSize, buffer_ + offset, sizeof(int32_t));
-  offset += sizeof(int64_t);
-
   out << "---- ProductMetadata Debug Summary ----\n";
   out << "Header:\n";
-  out << "  Product count:           " << productCount << "\n";
-  out << "  Serialized buffer size:  " << serializedBufferSize << " bytes\n";
+  out << "  Product count:           " << header_.productCount << "\n";
+  out << "  Serialized buffer size:  " << header_.serializedBufferSize << " bytes\n";
   out << "  Flags:";
-  if (productFlags & HasMissing)
+  if (hasMissing())
     out << " Missing";
-  if (productFlags & HasSerialized)
+  if (hasSerialized())
     out << " Serialized";
-  if (productFlags & HasTrivialCopy)
+  if (hasTrivialCopy())
     out << " TrivialCopy";
   out << "\n\n";
 
-  // --- Parse product entries ---
+  // Safe copy for reading
+  ProductMetadataBuilder reader(*this);
+  reader.readOffset_ = headerSize_;
+
   size_t count = 0;
   size_t numMissing = 0;
   size_t numSerialized = 0;
   size_t numTrivial = 0;
 
-  while (offset < size_) {
-    if (count >= static_cast<size_t>(productCount)) {
-      out << "WARNING: More metadata entries than header.productCount\n";
-      break;
-    }
+  try {
+    while (count < static_cast<size_t>(header_.productCount)) {
+      ProductMetadata meta = reader.getNext();
+      ++count;
 
-    if (offset + sizeof(uint8_t) > size_) {
-      out << "ERROR: Truncated metadata entry\n";
-      break;
-    }
+      out << "Product #" << count << ": ";
 
-    auto kind = static_cast<ProductMetadata::Kind>(buffer_[offset]);
-    offset += sizeof(uint8_t);
-    count++;
+      switch (meta.kind) {
+        case ProductMetadata::Kind::Missing:
+          ++numMissing;
+          out << "Missing\n";
+          break;
 
-    out << "Product #" << count << ": ";
+        case ProductMetadata::Kind::Serialized:
+          ++numSerialized;
+          out << "Serialized, size = " << meta.sizeMeta << "\n";
+          break;
 
-    switch (kind) {
-      case ProductMetadata::Kind::Missing:
-        numMissing++;
-        out << "Missing\n";
-        break;
-
-      case ProductMetadata::Kind::Serialized: {
-        if (offset + sizeof(size_t) > size_) {
-          out << "ERROR: Corrupted serialized metadata\n";
-          return;
-        }
-        size_t sz = 0;
-        std::memcpy(&sz, buffer_ + offset, sizeof(size_t));
-        offset += sizeof(size_t);
-        numSerialized++;
-        out << "Serialized, size = " << sz << "\n";
-        break;
+        case ProductMetadata::Kind::TrivialCopy:
+          ++numTrivial;
+          out << "TrivialCopy, size = " << meta.sizeMeta << "\n";
+          break;
       }
-
-      case ProductMetadata::Kind::TrivialCopy: {
-        if (offset + sizeof(size_t) > size_) {
-          out << "ERROR: Corrupted trivial-copy metadata\n";
-          return;
-        }
-        size_t sz = 0;
-        std::memcpy(&sz, buffer_ + offset, sizeof(size_t));
-        offset += sizeof(size_t);
-
-        if (offset + sz > size_) {
-          out << "ERROR: Trivial-copy data overflows buffer\n";
-          return;
-        }
-        offset += sz;
-        numTrivial++;
-        out << "TrivialCopy, size = " << sz << "\n";
-        break;
-      }
-
-      default:
-        out << "ERROR: Unknown product kind " << static_cast<int>(kind) << "\n";
-        return;
     }
-  }
-
-  if (count != static_cast<size_t>(productCount)) {
-    out << "\nWARNING: Parsed " << count << " entries, but header says " << productCount << "\n";
+  } catch (const std::exception& e) {
+    out << "\nERROR while parsing metadata: " << e.what() << "\n";
   }
 
   out << "\n----------------------------------------\n";

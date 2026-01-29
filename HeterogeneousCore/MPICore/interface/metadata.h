@@ -21,7 +21,6 @@ enum ProductFlags : uint8_t {
   HasTrivialCopy = 1 << 2,
 };
 
-// NOTE: MetadataHeader is NOT used for wire layout (padding differs).
 struct MetadataHeader {
   int16_t productCount = 0;
   uint8_t productFlags = 0;
@@ -44,9 +43,9 @@ public:
   explicit ProductMetadataBuilder(int16_t productCount);
   ~ProductMetadataBuilder();
 
-  // No copy
-  ProductMetadataBuilder(const ProductMetadataBuilder&) = delete;
-  ProductMetadataBuilder& operator=(const ProductMetadataBuilder&) = delete;
+  // Copy
+  ProductMetadataBuilder(const ProductMetadataBuilder& other);
+  ProductMetadataBuilder& operator=(const ProductMetadataBuilder& other);
 
   // Move
   ProductMetadataBuilder(ProductMetadataBuilder&& other) noexcept;
