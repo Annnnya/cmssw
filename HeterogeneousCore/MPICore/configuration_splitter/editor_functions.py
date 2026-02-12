@@ -114,19 +114,24 @@ def create_sender(
     """
     Add MPISender (local) for one module.
     """
+
     sender_products = make_sender_patterns(module_name, products)
 
+    # activity is now a string branch selector
+    activity = cms.string("")
     if path_state_capture is not None:
-        sender_products.append(f"*_{path_state_capture}__*".replace(" ", ""))
+        activity = cms.string(f"*_{path_state_capture}__*".replace(" ", ""))
 
     sender = cms.EDProducer(
         "MPISender",
         upstream=cms.InputTag(sender_upstream),
         instance=cms.int32(instance),
         products=cms.vstring(*sender_products),
+        activity=activity,
     )
 
     return sender
+
 
 
 
@@ -139,21 +144,15 @@ def create_receiver(
     """
     MPIReceiver (remote) for one module.
     """
-    receiver_products = make_receiver_psets(products)
 
-    if path_state_capture:
-        receiver_products.append(
-            cms.PSet(
-                type=cms.string("edm::PathStateToken"),
-                label=cms.string(""),
-            )
-        )
+    receiver_products = make_receiver_psets(products)
 
     receiver = cms.EDProducer(
         "MPIReceiver",
         upstream=cms.InputTag(receiver_upstream),
         instance=cms.int32(instance),
         products=cms.VPSet(*receiver_products),
+        activity=cms.bool(path_state_capture),
     )
 
     return receiver
