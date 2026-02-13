@@ -93,6 +93,16 @@ def make_receiver_psets(products):
     return cms.VPSet(*psets)
 
 
+def find_backend_product(products):
+    for p in products:
+        if (
+            p["product_instance"] == "backend"
+            and p["type"] == "unsigned short"
+        ):
+            return p
+    return None
+
+
 
 def replace_module(process, name, new_module):
     if hasattr(process, name):
@@ -115,22 +125,44 @@ def create_sender(
     Add MPISender (local) for one module.
     """
 
-    sender_products = make_sender_patterns(module_name, products)
+    print(products)
 
-    # activity is now a string branch selector
+    backend_product = find_backend_product(products)
+
+    # Remove backend from normal products
+    normal_products = [
+        p for p in products
+        if not (
+            p["product_instance"] == "backend"
+            and p["type"] == "unsigned short"
+        )
+    ]
+
+    sender_products = make_sender_patterns(module_name, normal_products)
+
     activity = cms.string("")
     if path_state_capture is not None:
         activity = cms.string(f"*_{path_state_capture}__*".replace(" ", ""))
 
-    sender = cms.EDProducer(
-        "MPISender",
-        upstream=cms.InputTag(sender_upstream),
-        instance=cms.int32(instance),
-        products=cms.vstring(*sender_products),
-        activity=activity,
-    )
-
+    if backend_product is not None:
+        sender = cms.EDProducer(
+            "MPISender",
+            upstream=cms.InputTag(sender_upstream),
+            instance=cms.int32(instance),
+            products=cms.vstring(*sender_products),
+            activity=activity,
+            backend=cms.string(f"{backend_product['instance']}_{module_name}_{backend_product['product_instance']}_*")
+        )
+    else:
+        sender = cms.EDProducer(
+            "MPISender",
+            upstream=cms.InputTag(sender_upstream),
+            instance=cms.int32(instance),
+            products=cms.vstring(*sender_products),
+            activity=activity,
+        )
     return sender
+
 
 
 
@@ -145,7 +177,17 @@ def create_receiver(
     MPIReceiver (remote) for one module.
     """
 
-    receiver_products = make_receiver_psets(products)
+    backend_product = find_backend_product(products)
+
+    normal_products = [
+        p for p in products
+        if not (
+            p["product_instance"] == "backend"
+            and p["type"] == "unsigned short"
+        )
+    ]
+
+    receiver_products = make_receiver_psets(normal_products)
 
     receiver = cms.EDProducer(
         "MPIReceiver",
@@ -154,6 +196,10 @@ def create_receiver(
         products=cms.VPSet(*receiver_products),
         activity=cms.bool(path_state_capture),
     )
+
+    # Tell receiver to produce backend
+    if backend_product is not None:
+        receiver.backend = cms.bool(True)
 
     return receiver
 

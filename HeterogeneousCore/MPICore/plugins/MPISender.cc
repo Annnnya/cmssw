@@ -55,6 +55,10 @@ public:
       activityPattern_.emplace(config.getParameter<std::string>("activity"));
     }
 
+    if (config.existsAs<std::string>("backend")) {
+      backendPattern_.emplace(config.getParameter<std::string>("backend"));
+    }
+
     products_.resize(patterns_.size());
 
     callWhenNewProductsRegistered([this](edm::ProductDescription const& product) {
@@ -92,24 +96,22 @@ public:
             Entry entry;
             entry.type = product.unwrappedType();
             entry.wrappedType = product.wrappedType();
-            entry.token = consumes(
-                edm::TypeToGet{product.unwrappedTypeID(), edm::PRODUCT_TYPE},
-                edm::InputTag{
-                    product.moduleLabel(),
-                    product.productInstanceName(),
-                    product.processName()
-                });
+            entry.token =
+                consumes(edm::TypeToGet{product.unwrappedTypeID(), edm::PRODUCT_TYPE},
+                         edm::InputTag{product.moduleLabel(), product.productInstanceName(), product.processName()});
 
-            LogDebug("MPISender")
-                << "send activity product \""
-                << product.friendlyClassName() << '_'
-                << product.moduleLabel() << '_'
-                << product.productInstanceName() << '_'
-                << product.processName()
-                << "\" over MPI channel instance " << instance_;
+            LogDebug("MPISender") << "send activity product \"" << product.friendlyClassName() << '_'
+                                  << product.moduleLabel() << '_' << product.productInstanceName() << '_'
+                                  << product.processName() << "\" over MPI channel instance " << instance_;
 
             activity_ = std::move(entry);
           }
+
+          if (backendPattern_ && backendPattern_->match(product)) {
+            backendToken_ = consumes<uint16_t>(
+                edm::InputTag{product.moduleLabel(), product.productInstanceName(), product.processName()});
+          }
+
           break;
 
         case edm::InLumi:
@@ -147,6 +149,16 @@ public:
     }
 
     if (is_active_) {
+      if (backendToken_) {
+        if (!backendToken_->isUninitialized()) {
+          auto handle = event.getHandle(*backendToken_);
+          if (!handle.isValid()) {
+            throw cms::Exception("MPISender") << "Backend product configured but not present in event.";
+          }
+          meta->setBackend(*handle);
+        }
+      }
+
       for (auto const& entry : products_) {
         // Get the product
         edm::Handle<edm::WrapperBase> handle(entry.type.typeInfo());
@@ -255,6 +267,7 @@ public:
         ->setComment(
             "Optional activity product. If parameter is present but the token is missing in the event, "
             "the sender will mark the event as inactive and skip data transfer.");
+    desc.addOptional<std::string>("backend")->setComment("Optional expected GPU backend identifier.");
 
     descriptions.addWithDefaultLabel(desc);
   }
@@ -279,8 +292,10 @@ private:
   int32_t const instance_;                         // instance used to identify the source-destination pair
   std::unique_ptr<TBufferFile> buffer_;
   size_t metadata_size_;
-  std::optional<edm::ProductNamePattern> activityPattern_; // activity product (optional)
+  std::optional<edm::ProductNamePattern> activityPattern_;  // activity product (optional)
   std::optional<Entry> activity_;
+  std::optional<edm::ProductNamePattern> backendPattern_;  // GPU backend of the upstream (if present)
+  std::optional<edm::EDGetTokenT<uint16_t>> backendToken_;
   bool has_serialized_ = false;
   bool is_active_ = true;
 };

@@ -40,12 +40,12 @@ process.producePortableObjects = cms.EDProducer("TestAlpakaProducer@alpaka",
 process.sender = MPISender(
     upstream = "mpiController",
     instance = 42,
+    backend = "ushort_producePortableObjects_backend_*",
     products = [
         "portabletestTestStructPortableHostObject_producePortableObjects__*",
         "128falseportabletestTestSoALayoutPortableHostCollection_producePortableObjects__*",
         "128falseportabletestSoABlocks2PortableHostCollection_producePortableObjects__*",
-        "128falseportabletestSoABlocks3PortableHostCollection_producePortableObjects__*",
-        "ushort_producePortableObjects_backend_*"
+        "128falseportabletestSoABlocks3PortableHostCollection_producePortableObjects__*"
     ]
 )
 

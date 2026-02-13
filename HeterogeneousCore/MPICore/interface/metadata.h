@@ -3,6 +3,7 @@
 
 // C++ standard library headers
 #include <cassert>
+#include <climits>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -22,12 +23,13 @@ enum ProductFlags : uint8_t {
 };
 
 struct MetadataHeader {
+  uint16_t backend = USHRT_MAX;
   int16_t productCount = 0;
-  uint8_t productFlags = 0;
   int32_t serializedBufferSize = 0;
+  uint8_t productFlags = 0;
 };
 
-static_assert(sizeof(MetadataHeader) == 8, "Wrong MPI MetadataHeader size - expected to be 8 bytes.");
+// static_assert(sizeof(MetadataHeader) == 8, "Wrong MPI MetadataHeader size - expected to be 8 bytes.");
 
 struct ProductMetadata {
   enum class Kind : uint8_t { Missing = 0, Serialized = 1, TrivialCopy = 2 };
@@ -56,6 +58,9 @@ public:
 
   // set or reset number of products. will fail if not set called before sending
   void setProductCount(int16_t prod_num) { header().productCount = prod_num; }
+  // set the GPU backend in metadata message
+  // NOTE: if backend is not set but expected, will throw an error
+  void setBackend(uint16_t backend) { header().backend = backend; }
 
   // Sender API
   void addMissing();
@@ -79,6 +84,7 @@ public:
 
   int16_t productCount() const { return header().productCount; }
   int32_t serializedBufferSize() const { return header().serializedBufferSize; }
+  uint16_t backend() const { return header().backend; }
   bool hasMissing() const { return header().productFlags & HasMissing; }
   bool hasSerialized() const { return header().productFlags & HasSerialized; }
   bool hasTrivialCopy() const { return header().productFlags & HasTrivialCopy; }

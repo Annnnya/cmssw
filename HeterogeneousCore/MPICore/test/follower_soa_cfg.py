@@ -18,6 +18,7 @@ process.maxEvents.input = -1
 process.receiver = MPIReceiver(
     upstream = "source",
     instance = 42,
+    backend = cms.bool(True),
     products = [
         dict(
             type = "PortableHostObject<portabletest::TestStruct>",
@@ -34,10 +35,6 @@ process.receiver = MPIReceiver(
         dict(
             type = "PortableHostCollection<portabletest::SoABlocks3<128,false> >",
             label = ""
-        ),
-        dict(
-            type = "ushort",
-            label = "backend"
         )
     ]
 )

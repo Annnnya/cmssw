@@ -12,6 +12,7 @@ ProductMetadataBuilder::ProductMetadataBuilder() : buffer_(nullptr), capacity_(0
   header().productCount = 0;
   header().productFlags = 0;
   header().serializedBufferSize = 0;
+  header().backend = USHRT_MAX;
 }
 
 ProductMetadataBuilder::ProductMetadataBuilder(int16_t productCount)
@@ -23,6 +24,7 @@ ProductMetadataBuilder::ProductMetadataBuilder(int16_t productCount)
   header().productCount = static_cast<int16_t>(productCount);
   header().productFlags = 0;
   header().serializedBufferSize = 0;
+  header().backend = USHRT_MAX;
 }
 
 ProductMetadataBuilder::~ProductMetadataBuilder() {
@@ -173,6 +175,8 @@ void ProductMetadataBuilder::debugPrintMetadataSummary() {
   out << "Header:\n";
   out << "  Product count:           " << header().productCount << "\n";
   out << "  Serialized buffer size:  " << header().serializedBufferSize << " bytes\n";
+  out << "  Backend:  " << (header().backend == USHRT_MAX ? "not present" : std::to_string(header().backend))
+      << " bytes\n";
   out << "  Flags:";
   if (hasMissing())
     out << " Missing";
