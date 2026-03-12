@@ -39,7 +39,7 @@ namespace {
 MPIChannel MPIChannel::duplicate() const {
   MPI_Comm newcomm;
   MPI_Comm_dup(comm_, &newcomm);
-  return MPIChannel(newcomm, dest_);
+  return MPIChannel(newcomm, dest_, self_world_rank_);
 }
 
 // close the underlying communicator and reset the MPIChannel to an invalid state

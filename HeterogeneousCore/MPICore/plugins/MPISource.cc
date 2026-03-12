@@ -75,81 +75,80 @@ private:
 };
 
 MPISource::MPISource(edm::ParameterSet const& config, edm::InputSourceDescription const& desc)
-    :  // note that almost all configuration parameters passed to IDGeneratorSourceBase via ProducerSourceBase will
-       // effectively be ignored, because this ConfigurableSource will explicitly set the run, lumi, and event
-       // numbers, the timestamp, and the event type
-      edm::ProducerSourceBase(config, desc, false),
+    : edm::ProducerSourceBase(config, desc, false),
       token_(produces<MPIToken>()),
-      mode_(parseMode(config.getUntrackedParameter<std::string>("mode")))  //
-{
-  // make sure that MPI is initialised
-
+      mode_(parseMode(config.getUntrackedParameter<std::string>("mode"))) {
+  // make sure MPI is initialised
   MPIService::required();
 
   // Make sure the EDM MPI types are available.
   EDM_MPI_build_types();
 
   if (mode_ == kCommWorld) {
-    // All processes are in MPI_COMM_WORLD.
-    // The current implementation supports only two processes: one controller and one source.
     edm::LogAbsolute("MPI") << "MPISource in " << ModeDescription[mode_] << " mode.";
 
-    // Check how many processes are there in MPI_COMM_WORLD
-    int size;
-    MPI_Comm_size(MPI_COMM_WORLD, &size);
-    if (size != 2) {
-      throw edm::Exception(edm::errors::Configuration)
-          << "The current implementation supports only two processes: one controller and one source.";
+    int world_size, world_rank;
+    MPI_Comm_size(MPI_COMM_WORLD, &world_size);
+    MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
+
+    MPI_Group world_group;
+    MPI_Comm_group(MPI_COMM_WORLD, &world_group);
+
+    // exchange remote flags with all ranks
+    int is_remote = 1;  // mark ourselves as remote
+    std::vector<int> all_is_remote(world_size, 0);
+    MPI_Allgather(&is_remote, 1, MPI_INT, all_is_remote.data(), 1, MPI_INT, MPI_COMM_WORLD);
+
+    // identify the "local" rank (the controller)
+    int local_rank = -1;
+    for (int i = 0; i < world_size; ++i) {
+      if (all_is_remote[i] == 0) {  // only one local is expected
+        local_rank = i;
+        break;
+      }
     }
 
-    // Check the rank of this process, and determine the rank of the other process.
-    int rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    edm::LogAbsolute("MPI") << "MPISource has rank " << rank << " in MPI_COMM_WORLD.";
-    int other_rank = 1 - rank;
-    comm_ = MPI_COMM_WORLD;
-    channel_ = MPIChannel(comm_, other_rank);
+    if (local_rank < 0) {
+      throw edm::Exception(edm::errors::LogicError)
+          << "MPISource could not find any local controller rank in MPI_COMM_WORLD.";
+    }
+
+    // create a communicator only between this remote and the local rank
+    for (int remote_rank = 0; remote_rank < world_size; ++remote_rank) {
+      if (remote_rank == local_rank)
+        continue;
+      // first rank of this process, then controller rank
+      int ranks[2] = {remote_rank, local_rank};
+      MPI_Group pair_group;
+      MPI_Comm pair_comm;
+      MPI_Group_incl(world_group, 2, ranks, &pair_group);
+      MPI_Comm_create_group(MPI_COMM_WORLD, pair_group, 0, &pair_comm);
+
+      if (pair_comm != MPI_COMM_NULL) {
+        comm_ = pair_comm;
+        channel_ = MPIChannel(comm_, 1, world_rank);
+      }
+
+      MPI_Group_free(&pair_group);
+
+      edm::LogAbsolute("MPI") << "From remote: Created communicator between remote rank " << remote_rank
+                              << " and local rank " << local_rank;
+    }
+    MPI_Group_free(&world_group);
+
+    // Wait for connection from controller
+    MPI_Status status;
+    EDM_MPI_Empty_t buffer;
+    edm::LogAbsolute("MPI") << "receiving connect from " << world_rank << " from local " << local_rank;
+    MPI_Recv(&buffer, 1, EDM_MPI_Empty, 1, EDM_MPI_Connect, comm_, &status);
+    edm::LogAbsolute("MPI") << "Connected to controller rank " << status.MPI_SOURCE;
+
   } else if (mode_ == kIntercommunicator) {
-    // Use an intercommunicator to let two groups of processes communicate with each other.
-    // The current implementation supports only two processes: one controller and one source.
-    edm::LogAbsolute("MPI") << "MPISource in " << ModeDescription[mode_] << " mode.";
-
-    // Check how many processes are there in MPI_COMM_WORLD
-    int size;
-    MPI_Comm_size(MPI_COMM_WORLD, &size);
-    if (size != 1) {
-      throw edm::Exception(edm::errors::Configuration)
-          << "The current implementation supports only two processes: one controller and one source.";
-    }
-
-    // Open a server-side port.
-    MPI_Open_port(MPI_INFO_NULL, port_);
-
-    // Publish the port under the name indicated by the parameter "server".
-    std::string name = config.getUntrackedParameter<std::string>("name", "server");
-    MPI_Info port_info;
-    MPI_Info_create(&port_info);
-    MPI_Info_set(port_info, "ompi_global_scope", "true");
-    MPI_Info_set(port_info, "ompi_unique", "true");
-    MPI_Publish_name(name.c_str(), port_info, port_);
-
-    // Create an intercommunicator and accept a client connection.
-    edm::LogAbsolute("MPI") << "Waiting for a connection to the MPI server at port " << port_;
-
-    MPI_Comm_accept(port_, MPI_INFO_NULL, 0, MPI_COMM_SELF, &comm_);
-    edm::LogAbsolute("MPI") << "Connection accepted.";
-    channel_ = MPIChannel(comm_, 0);
+    throw edm::Exception(edm::errors::Configuration) << "Intercommunicator not supported yet.";
   } else {
-    // Invalid mode.
     throw edm::Exception(edm::errors::Configuration)
         << "Invalid mode \"" << config.getUntrackedParameter<std::string>("mode") << "\"";
   }
-
-  // Wait for a client to connect.
-  MPI_Status status;
-  EDM_MPI_Empty_t buffer;
-  MPI_Recv(&buffer, 1, EDM_MPI_Empty, MPI_ANY_SOURCE, EDM_MPI_Connect, comm_, &status);
-  edm::LogAbsolute("MPI") << "connected from " << status.MPI_SOURCE;
 }
 
 MPISource::~MPISource() {

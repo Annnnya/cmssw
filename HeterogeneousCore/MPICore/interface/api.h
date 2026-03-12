@@ -25,7 +25,8 @@
 class MPIChannel {
 public:
   MPIChannel() = default;
-  MPIChannel(MPI_Comm comm, int destination) : comm_(comm), dest_(destination) {}
+  MPIChannel(MPI_Comm comm, int destination, int self_rank)
+      : comm_(comm), dest_(destination), self_world_rank_(self_rank) {}
 
   // build a new MPIChannel that uses a duplicate of the underlying communicator and the same destination
   MPIChannel duplicate() const;
@@ -50,6 +51,8 @@ public:
 
   // signal the end of run, and re-transmit the RunAuxiliary
   void sendEndRun(edm::RunAuxiliary const& aux) { sendRunAuxiliary_(EDM_MPI_EndRun, aux); }
+
+  int getMyRank() { return self_world_rank_; }
 
   // signal a new luminosity block, and transmit the LuminosityBlockAuxiliary
   void sendBeginLuminosityBlock(edm::LuminosityBlockAuxiliary const& aux) {
@@ -177,6 +180,7 @@ private:
 
   // MPI destination
   int dest_ = MPI_UNDEFINED;
+  int self_world_rank_ = -1;
 };
 
 #endif  // HeterogeneousCore_MPICore_interface_api_h

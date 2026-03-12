@@ -75,8 +75,11 @@ private:
       return kInvalid;
   }
 
-  MPI_Comm comm_ = MPI_COMM_NULL;
-  MPIChannel channel_;
+  std::vector<MPI_Comm> comms_;       // one communicator per other rank
+  std::vector<MPIChannel> channels_;  // one channel per communicator
+  // is it thread safe?
+  size_t next_channel_index_ = 0;
+  MPI_Comm comm_world_ = MPI_COMM_NULL;
   edm::EDPutTokenT<MPIToken> token_;
   Mode mode_;
 };
@@ -92,53 +95,81 @@ MPIController::MPIController(edm::ParameterSet const& config)
   EDM_MPI_build_types();
 
   if (mode_ == kCommWorld) {
-    // All processes are in MPI_COMM_WORLD.
-    // The current implementation supports only two processes: one controller and one source.
     edm::LogAbsolute("MPI") << "MPIController in " << ModeDescription[mode_] << " mode.";
 
-    // Check how many processes are there in MPI_COMM_WORLD
-    int size;
-    MPI_Comm_size(MPI_COMM_WORLD, &size);
-    if (size != 2) {
-      throw edm::Exception(edm::errors::Configuration)
-          << "The current implementation supports only two processes: one controller and one source.";
+    int world_size, world_rank;
+    MPI_Comm_size(MPI_COMM_WORLD, &world_size);
+    MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
+
+    comm_world_ = MPI_COMM_WORLD;  // keep for broadcasts, etc.
+
+    MPI_Group world_group;
+    MPI_Comm_group(MPI_COMM_WORLD, &world_group);
+
+    // fing out types of other processes in the world
+    int is_remote = 0;  // mark ourselves as local
+    std::vector<int> all_is_remote(world_size, 0);
+    MPI_Allgather(&is_remote, 1, MPI_INT, all_is_remote.data(), 1, MPI_INT, MPI_COMM_WORLD);
+
+
+    for (int other = 0; other < world_size; ++other) {
+      if (other == world_rank)
+        continue;
+      if (!all_is_remote[other])
+        continue;
+
+      // first source rank, then rank of this process (controller)
+      int ranks[2] = {other, world_rank};
+      MPI_Group pair_group;
+      MPI_Comm pair_comm;
+
+      MPI_Group_incl(world_group, 2, ranks, &pair_group);
+      MPI_Comm_create_group(MPI_COMM_WORLD, pair_group, 0, &pair_comm);
+
+      if (pair_comm != MPI_COMM_NULL) {
+        channels_.emplace_back(pair_comm, 0, world_rank);
+        edm::LogAbsolute("MPI") << "From local: Created communicator between ranks " << other << " and " << world_rank;
+      } else {
+        throw edm::Exception(edm::errors::LogicError) << "Failed to create communicator pair" << "\"";
+      }
+
+      MPI_Group_free(&pair_group);
     }
 
-    // Check the rank of this process, and determine the rank of the other process.
-    int rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    edm::LogAbsolute("MPI") << "MPIController has rank " << rank << " in MPI_COMM_WORLD.";
-    int other_rank = 1 - rank;
-    comm_ = MPI_COMM_WORLD;
-    channel_ = MPIChannel(comm_, other_rank);
+    MPI_Group_free(&world_group);
   } else if (mode_ == kIntercommunicator) {
-    // Use an intercommunicator to let two groups of processes communicate with each other.
-    // The current implementation supports only two processes: one controller and one source.
-    edm::LogAbsolute("MPI") << "MPISource in " << ModeDescription[mode_] << " mode.";
-
-    // Check how many processes are there in MPI_COMM_WORLD
-    int size;
-    MPI_Comm_size(MPI_COMM_WORLD, &size);
-    if (size != 1) {
-      throw edm::Exception(edm::errors::Configuration)
-          << "The current implementation supports only two processes: one controller and one source.";
-    }
+    edm::LogAbsolute("MPI") << "MPIController in " << ModeDescription[mode_] << " mode.";
 
     // Look for the port under the name indicated by the parameter "server".
     std::string name = config.getUntrackedParameter<std::string>("name", "server");
+
     char port[MPI_MAX_PORT_NAME];
     MPI_Lookup_name(name.c_str(), MPI_INFO_NULL, port);
+
     edm::LogAbsolute("MPI") << "Trying to connect to the MPI server on port " << port;
 
-    // Create an intercommunicator and connect to the server.
-    MPI_Comm_connect(port, MPI_INFO_NULL, 0, MPI_COMM_SELF, &comm_);
-    MPI_Comm_remote_size(comm_, &size);
-    if (size != 1) {
+    MPI_Comm intercomm;
+    MPI_Comm_connect(port, MPI_INFO_NULL, 0, MPI_COMM_SELF, &intercomm);
+
+    int remote_size;
+    MPI_Comm_remote_size(intercomm, &remote_size);
+
+    if (remote_size != 1) {
       throw edm::Exception(edm::errors::Configuration)
-          << "The current implementation supports only two processes: one controller and one source.";
+          << "Intercommunicator mode currently supports exactly one remote process, "
+          << "but found " << remote_size;
     }
-    edm::LogAbsolute("MPI") << "Client connected to " << size << (size == 1 ? " server" : " servers");
-    channel_ = MPIChannel(comm_, 0);
+
+    edm::LogAbsolute("MPI") << "Client connected to " << remote_size << (remote_size == 1 ? " server." : " servers.");
+
+    // Store communicator in the vector
+    comms_.push_back(intercomm);
+
+    int world_rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
+
+    // Create the corresponding channel (remote rank is 0 in the intercomm)
+    channels_.emplace_back(intercomm, 0, world_rank);
   } else {
     // Invalid mode.
     throw edm::Exception(edm::errors::Configuration)
@@ -149,13 +180,15 @@ MPIController::MPIController(edm::ParameterSet const& config)
 MPIController::~MPIController() {
   // Close the intercommunicator.
   if (mode_ == kIntercommunicator) {
-    MPI_Comm_disconnect(&comm_);
+    MPI_Comm_disconnect(&comms_[0]);
   }
 }
 
 void MPIController::beginJob() {
   // signal the connection
-  channel_.sendConnect();
+  for (auto& channel : channels_) {
+    channel.sendConnect();
+  }
 
   /* is there a way to access all known process histories ?
   edm::ProcessHistoryRegistry const& registry = * edm::ProcessHistoryRegistry::instance();
@@ -168,7 +201,9 @@ void MPIController::beginJob() {
 
 void MPIController::endJob() {
   // signal the disconnection
-  channel_.sendDisconnect();
+  for (auto& channel : channels_) {
+    channel.sendDisconnect();
+  }
 }
 
 void MPIController::beginRun(edm::Run const& run, edm::EventSetup const& setup) {
@@ -186,10 +221,12 @@ void MPIController::beginRun(edm::Run const& run, edm::EventSetup const& setup) 
    */
   auto aux = run.runAuxiliary();
   aux.setProcessHistoryID(run.processHistory().id());
-  channel_.sendBeginRun(aux);
+  for (auto& channel : channels_) {
+    channel.sendBeginRun(aux);
 
-  // transmit the ProcessHistory
-  channel_.sendProduct(0, run.processHistory());
+    // transmit the ProcessHistory
+    channel.sendProduct(0, run.processHistory());
+  }
 }
 
 void MPIController::endRun(edm::Run const& run, edm::EventSetup const& setup) {
@@ -207,7 +244,9 @@ void MPIController::endRun(edm::Run const& run, edm::EventSetup const& setup) {
    */
   auto aux = run.runAuxiliary();
   aux.setProcessHistoryID(run.processHistory().id());
-  channel_.sendEndRun(aux);
+  for (auto& channel : channels_) {
+    channel.sendEndRun(aux);
+  }
 }
 
 void MPIController::beginLuminosityBlock(edm::LuminosityBlock const& lumi, edm::EventSetup const& setup) {
@@ -225,7 +264,9 @@ void MPIController::beginLuminosityBlock(edm::LuminosityBlock const& lumi, edm::
    */
   auto aux = lumi.luminosityBlockAuxiliary();
   aux.setProcessHistoryID(lumi.processHistory().id());
-  channel_.sendBeginLuminosityBlock(aux);
+  for (auto& channel : channels_) {
+    channel.sendBeginLuminosityBlock(aux);
+  }
 }
 
 void MPIController::endLuminosityBlock(edm::LuminosityBlock const& lumi, edm::EventSetup const& setup) {
@@ -243,30 +284,39 @@ void MPIController::endLuminosityBlock(edm::LuminosityBlock const& lumi, edm::Ev
    */
   auto aux = lumi.luminosityBlockAuxiliary();
   aux.setProcessHistoryID(lumi.processHistory().id());
-  channel_.sendEndLuminosityBlock(aux);
+  for (auto& channel : channels_) {
+    channel.sendEndLuminosityBlock(aux);
+  }
 }
 
 void MPIController::produce(edm::Event& event, edm::EventSetup const& setup) {
   {
     edm::LogInfo log("MPI");
-    log << "processing run " << event.run() << ", lumi " << event.luminosityBlock() << ", event " << event.id().event();
-    log << "\nprocess history:    " << event.processHistory();
-    log << "\nprocess history id: " << event.processHistory().id();
-    log << "\nprocess history id: " << event.eventAuxiliary().processHistoryID() << " (from eventAuxiliary)";
-    log << "\nisRealData " << event.eventAuxiliary().isRealData();
-    log << "\nexperimentType " << event.eventAuxiliary().experimentType();
-    log << "\nbunchCrossing " << event.eventAuxiliary().bunchCrossing();
-    log << "\norbitNumber " << event.eventAuxiliary().orbitNumber();
-    log << "\nstoreNumber " << event.eventAuxiliary().storeNumber();
-    log << "\nprocessHistoryID " << event.eventAuxiliary().processHistoryID();
-    log << "\nprocessGUID " << edm::Guid(event.eventAuxiliary().processGUID(), true).toString();
+    log << "processing run " << event.run() << ", lumi " << event.luminosityBlock() << ", event " << event.id().event()
+        << "\nprocess history:    " << event.processHistory() << "\nprocess history id: " << event.processHistory().id()
+        << "\nprocess history id: " << event.eventAuxiliary().processHistoryID() << " (from eventAuxiliary)"
+        << "\nisRealData " << event.eventAuxiliary().isRealData() << "\nexperimentType "
+        << event.eventAuxiliary().experimentType() << "\nbunchCrossing " << event.eventAuxiliary().bunchCrossing()
+        << "\norbitNumber " << event.eventAuxiliary().orbitNumber() << "\nstoreNumber "
+        << event.eventAuxiliary().storeNumber() << "\nprocessHistoryID " << event.eventAuxiliary().processHistoryID()
+        << "\nprocessGUID " << edm::Guid(event.eventAuxiliary().processGUID(), true).toString();
   }
 
-  // signal a new event, and transmit the EventAuxiliary
-  channel_.sendEvent(event.eventAuxiliary());
+  // pick communicator in round-robin fashion
+  if (channels_.empty()) {
+    throw edm::Exception(edm::errors::LogicError) << "MPIController: no available channels to send event data!";
+  }
 
-  // duplicate the MPIChannel and put the copy into the Event
-  std::shared_ptr<MPIChannel> link(new MPIChannel(channel_.duplicate()), [](MPIChannel* ptr) {
+  MPIChannel& selected_channel = channels_[next_channel_index_];
+  next_channel_index_ = (next_channel_index_ + 1) % channels_.size();
+
+  edm::LogAbsolute("MPI") << "Event " << event.id().event() << " sent through channel index " << next_channel_index_;
+
+  // signal a new event via this channel
+  selected_channel.sendEvent(event.eventAuxiliary());
+
+  // duplicate the selected MPIChannel and store in the event
+  std::shared_ptr<MPIChannel> link(new MPIChannel(selected_channel.duplicate()), [](MPIChannel* ptr) {
     ptr->reset();
     delete ptr;
   });
