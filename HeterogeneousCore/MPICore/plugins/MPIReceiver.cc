@@ -64,6 +64,8 @@ public:
   void acquire(edm::Event const& event, edm::EventSetup const&, edm::WaitingTaskWithArenaHolder holder) final {
     const MPIToken& token = event.get(upstream_);
 
+    // edm::LogAbsolute("MPIReceiver") << "Message was received on process rank " << token.channel()->getMyRank();
+
     //also try unique or optional
     received_meta_ = std::make_shared<ProductMetadataBuilder>();
 
