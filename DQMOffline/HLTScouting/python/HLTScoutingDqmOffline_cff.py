@@ -17,6 +17,7 @@ from HLTriggerOffline.Scouting.HLTScoutingEGammaDqmOffline_cff import *
 
 ### Jets Monitoring
 from DQMOffline.JetMET.jetMETDQMOfflineSource_cff import *
+from DQMOffline.Trigger.JetMETPromptMonitor_cff import *
 
 ### Miscellaneous monitoring
 from DQM.HLTEvF.ScoutingCollectionMonitor_cfi import *
@@ -24,21 +25,33 @@ from DQM.HLTEvF.ScoutingCollectionMonitor_cfi import *
 ### RecHits monitoring
 from HLTriggerOffline.Scouting.ScoutingRecHitAnalyzers_cff import *
 
+### DiLeptons monitoring
+from HLTriggerOffline.Scouting.HLTScoutingDileptonMonitor_cfi import *
+
+### Pi0 Monitoring
+from HLTriggerOffline.Scouting.HLTScoutingPi0Monitor_cfi import *
+
 hltScoutingMuonDqmOffline = cms.Sequence(scoutingMonitoringTagProbeMuonNoVtx *
                                          scoutingMonitoringTagProbeMuonVtx *
                                          scoutingMonitoringTriggerMuon_DoubleMu *
                                          scoutingMonitoringTriggerMuon_SingleMu *
                                          ScoutingMuonPropertiesMonitor )
 
-hltScoutingJetDqmOffline = cms.Sequence(jetMETDQMOfflineSourceScouting)
+hltScoutingJetDqmOffline = cms.Sequence(jetMETDQMOfflineSourceScouting +
+                                        jetmetScoutingMonitorHLT)
 ## remove corrector to not schedule the run of the corrector modules which crash if scouting objects are missing
-hltScoutingJetDqmOfflineForRelVals = cms.Sequence(jetMETDQMOfflineSourceScoutingNoCorrection)
+hltScoutingJetDqmOfflineForRelVals = cms.Sequence(jetMETDQMOfflineSourceScoutingNoCorrection +
+                                                  jetmetScoutingNoJECsMonitorHLT)
 
 hltScoutingCollectionMonitor = cms.Sequence(scoutingCollectionMonitor)
+hltScoutingDileptonMonitor = cms.Sequence(ScoutingDileptonMonitor)
+hltScoutingPi0Monitor = cms.Sequence(ScoutingPi0Monitor)
 
 hltScoutingDqmOffline = cms.Sequence(hltScoutingMuonDqmOffline +
                                      hltScoutingEGammaDqmOffline +
                                      hltScoutingJetDqmOffline +
+                                     hltScoutingDileptonMonitor +
+                                     hltScoutingPi0Monitor +
                                      hltScoutingCollectionMonitor)
 
 ## Add the scouting rechits monitoring (only for 2025, integrated in menu GRun 2025 V1.3)
