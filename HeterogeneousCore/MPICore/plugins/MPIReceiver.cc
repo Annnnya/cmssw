@@ -37,8 +37,7 @@ public:
         token_(produces<MPIToken>()),
         instance_(config.getParameter<int32_t>("instance")),  //
         activity_(config.getParameter<bool>("activity")),
-        enableTrivialSerialisation_(config.getUntrackedParameter<bool>("enableTrivialSerialisation"))
-  {
+        enableTrivialSerialisation_(config.getUntrackedParameter<bool>("enableTrivialSerialisation")) {
     // instance 0 is reserved for the MPIController / MPISource pair
     // instance values greater than 255 may not fit in the MPI tag
     if (instance_ < 1 or instance_ > 255) {

@@ -148,9 +148,9 @@ public:
         if (handle.isValid()) {
           edm::WrapperBase const* wrapper = handle.product();
           std::unique_ptr<ngt::SerialiserBase> serialiser;
-        if (enableTrivialSerialisation_) {
+          if (enableTrivialSerialisation_) {
             serialiser = ngt::SerialiserFactory::get()->tryToCreate(entry.type.typeInfo().name());
-        }
+          }
 
           if (serialiser) {
             LogDebug("MPISender") << "Found serializer for type \"" << entry.type.name() << "\" ("
