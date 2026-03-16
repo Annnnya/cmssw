@@ -35,8 +35,10 @@ public:
   MPIReceiver(edm::ParameterSet const& config)
       : upstream_(consumes<MPIToken>(config.getParameter<edm::InputTag>("upstream"))),
         token_(produces<MPIToken>()),
-        instance_(config.getParameter<int32_t>("instance")),
-        activity_(config.getParameter<bool>("activity")) {
+        instance_(config.getParameter<int32_t>("instance")),  //
+        activity_(config.getParameter<bool>("activity")),
+        enableTrivialSerialisation_(config.getUntrackedParameter<bool>("enableTrivialSerialisation"))
+  {
     // instance 0 is reserved for the MPIController / MPISource pair
     // instance values greater than 255 may not fit in the MPI tag
     if (instance_ < 1 or instance_ > 255) {
@@ -128,6 +130,12 @@ public:
       }
 
       else if (product_meta.kind == ProductMetadata::Kind::TrivialCopy) {
+        if (not enableTrivialSerialisation_) {
+          edm::LogError("MPIReceiver")
+              << "Received a trivially-serialised product, but enableTrivialSerialisation is set to false in this "
+                 "MPIReceiver. Please check that the MPISender and MPIReceiver have consistent settings.";
+          MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+        }
         std::unique_ptr<ngt::SerialiserBase> serialiser =
             ngt::SerialiserFactory::get()->tryToCreate(entry.type.typeInfo().name());
         if (not serialiser) {
@@ -177,6 +185,10 @@ public:
         ->setComment("A value between 1 and 255 used to identify a matching pair of \"MPISender\"/\"MPIReceiver\".");
     desc.add<bool>("activity", false)
         ->setComment("Whether this receiver will get activity information from the sender.");
+    desc.addUntracked<bool>("enableTrivialSerialisation", true)
+        ->setComment(
+            "If true (default), use the trivial serialisation mechanism for supported types. If false, always use "
+            "ROOT serialisation for all types. Useful for benchmarking.");
 
     descriptions.addWithDefaultLabel(desc);
   }
@@ -194,8 +206,8 @@ private:
   int32_t const instance_;                  // instance used to identify the source-destination pair
   bool activity_;                           // indicator whether the PathStateToken will be received by the module
   edm::EDPutTokenT<edm::PathStateToken> pathStateToken_;
-
   std::shared_ptr<ProductMetadataBuilder> received_meta_;
+  bool enableTrivialSerialisation_ = true;
 };
 
 #include "FWCore/Framework/interface/MakerMacros.h"

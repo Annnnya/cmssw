@@ -1,0 +1,74 @@
+[
+  {
+    "branch": 0,
+    "friendly_type_name": "FEDRawDataCollection",
+    "module": "fedRawDataCollectionProducer",
+    "process": "UnsplitTestProcess",
+    "product_instance": "",
+    "type": "FEDRawDataCollection"
+  },
+  {
+    "branch": 0,
+    "friendly_type_name": "RawDataBuffer",
+    "module": "rawDataBufferProducer",
+    "process": "UnsplitTestProcess",
+    "product_instance": "",
+    "type": "RawDataBuffer"
+  },
+  {
+    "branch": 0,
+    "friendly_type_name": "edmHLTPathStatus",
+    "module": "path1",
+    "process": "UnsplitTestProcess",
+    "product_instance": "",
+    "type": "edm::HLTPathStatus"
+  },
+  {
+    "branch": 0,
+    "friendly_type_name": "edmHLTPathStatus",
+    "module": "path2",
+    "process": "UnsplitTestProcess",
+    "product_instance": "",
+    "type": "edm::HLTPathStatus"
+  },
+  {
+    "branch": 0,
+    "friendly_type_name": "edmHLTPathStatus",
+    "module": "path3",
+    "process": "UnsplitTestProcess",
+    "product_instance": "",
+    "type": "edm::HLTPathStatus"
+  },
+  {
+    "branch": 0,
+    "friendly_type_name": "edmHLTPathStatus",
+    "module": "path4",
+    "process": "UnsplitTestProcess",
+    "product_instance": "",
+    "type": "edm::HLTPathStatus"
+  },
+  {
+    "branch": 0,
+    "friendly_type_name": "edmTriggerResults",
+    "module": "TriggerResults",
+    "process": "UnsplitTestProcess",
+    "product_instance": "",
+    "type": "edm::TriggerResults"
+  },
+  {
+    "branch": 0,
+    "friendly_type_name": "edmTriggerResults",
+    "module": "triggerResultsProducer",
+    "process": "UnsplitTestProcess",
+    "product_instance": "",
+    "type": "edm::TriggerResults"
+  },
+  {
+    "branch": 0,
+    "friendly_type_name": "triggerTriggerEvent",
+    "module": "triggerEventProducer",
+    "process": "UnsplitTestProcess",
+    "product_instance": "",
+    "type": "trigger::TriggerEvent"
+  }
+]
