@@ -29,6 +29,7 @@
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
 #include "FWCore/ParameterSet/interface/ParameterSetDescription.h"
 #include "FWCore/ParameterSet/interface/ParameterSetDescriptionFiller.h"
+#include "FWCore/ServiceRegistry/interface/Service.h"
 #include "FWCore/Sources/interface/ProducerSourceBase.h"
 #include "FWCore/Utilities/interface/EDMException.h"
 #include "FWCore/Utilities/interface/StreamID.h"
@@ -81,8 +82,7 @@ MPISource::MPISource(edm::ParameterSet const& config, edm::InputSourceDescriptio
        // numbers, the timestamp, and the event type
       edm::ProducerSourceBase(config, desc, false),
       token_(produces<MPIToken>()),
-      mode_(parseMode(config.getUntrackedParameter<std::string>("mode")))  //
-{
+      mode_(parseMode(config.getUntrackedParameter<std::string>("mode"))) {
   // Make sure that MPI is initialised.
   MPIService::required();
 
@@ -101,21 +101,30 @@ MPISource::MPISource(edm::ParameterSet const& config, edm::InputSourceDescriptio
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-    // Determine the rank of the other process.
-    int remote = config.getUntrackedParameter<int>("controller");
-    if (remote == -1) {
-      // When there are only two proccesses, we can assume the ranks to be 0 and 1,
-      // and we can infer the other process rank from our own.
-      if (size == 2) {
-        remote = 1 - rank;
-      } else {
-        throw edm::Exception(edm::errors::Configuration)
-            << "Setting the remote rank to -1 is valid only where there are exactly two processes.";
-      }
+    edm::LogAbsolute("MPI") << "MPISource sees world size " << size;
+
+    // All remotes send the hash of their names, while local sends 0
+    // One remote process has to make one communication channel with the local process
+    // If local process is not unique, error is thrown
+    edm::Service<MPIService> mpiservice;
+    mpiservice->exchangeProcessHashes();
+    auto controller_name = config.getParameter<std::string>("controllerProcessName");
+    if (controller_name.empty()) {
+      edm::LogError("MPI") << "ERROR: Controller process name cannot be empty. Aborting MPISource...";
+      MPI_Abort(MPI_COMM_WORLD, 1);
     }
-    if (remote < 0 or remote >= size) {
-      throw edm::Exception(edm::errors::Configuration)
-          << "The rank of the remote process (" << remote << ") is invalid. Valid ranks are 0 to " << size - 1 << ".";
+
+    auto controller_indexes = mpiservice->getProcessIndexByName(controller_name);
+    int remote = -1;
+    if (controller_indexes.empty()) {
+              edm::LogError("MPI") << "ERROR: No controller process with name " << controller_name << " found. Aborting...";
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    } else if (controller_indexes.size() == 1) {
+      remote = controller_indexes[0];
+    } else {
+      edm::LogError("MPI") << "ERROR: Multiple controller processes with name " << controller_name
+                           << " were found. Currently, only one controller process is supported. Aborting...";
+      MPI_Abort(MPI_COMM_WORLD, 1);
     }
 
     // Create a new communicator that spans only this process and the one with the given remote rank.
@@ -126,7 +135,7 @@ MPISource::MPISource(edm::ParameterSet const& config, edm::InputSourceDescriptio
     MPI_Comm_create_group(MPI_COMM_WORLD, comm_group, 0, &comm_);
     MPI_Group_free(&world_group);
     MPI_Group_free(&comm_group);
-    edm::LogAbsolute("MPI") << "The remote process and MPISource have ranks " << remote << ", " << rank
+    edm::LogAbsolute("MPI") << "The MPIController process and MPISource have ranks " << remote << ", " << rank
                             << " in MPI_COMM_WORLD, mapped to ranks 0, 1 in their private communicator.";
     // The remote process always has rank 0 in the new communicator.
     remote = 0;
@@ -364,13 +373,13 @@ void MPISource::fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
   desc.ifValue(
           edm::ParameterDescription<std::string>("mode", "CommWorld", false),
           ModeDescription[kCommWorld] >>
-                  edm::ParameterDescription<int>(
-                      "controller",
-                      -1,
+                  edm::ParameterDescription<std::string>(
+                      "controllerProcessName",
+                      "",
                       false,
-                      edm::Comment("Rank of the remote \"controller\" process.\n"
-                                   "When there are only two processes, pass -1 to autodetect the rank of the remote "
-                                   "process based on the rank of the current process.")) or
+                      edm::Comment(
+                          "Process name of the controller process corresponding to this MPISource.\n"
+                          "Only one process with this name is expected.\n" )) or
               ModeDescription[kIntercommunicator] >> edm::ParameterDescription<std::string>("name", "server", false))
       ->setComment(
           "Valid modes are CommWorld (use MPI_COMM_WORLD) and Intercommunicator (use an MPI name server to setup an "
