@@ -5,7 +5,6 @@
 #include <Eigen/Dense>
 
 #include "DataFormats/AlpakaCommon/interface/alpaka/EDMetadata.h"
-#include "DataFormats/Common/interface/DeviceProduct.h"
 #include "DataFormats/Common/interface/Wrapper.h"
 #include "DataFormats/Portable/interface/PortableCollection.h"
 #include "DataFormats/Portable/interface/PortableHostCollection.h"
@@ -148,7 +147,7 @@ TEST_CASE("Test MemoryCopyTraits", "[MemoryCopyTraits]") {
       static_assert(::ngt::HasMemoryCopyTraits<PortableCollectionType>);
 
       // Get the Serialiser plugin for this type
-      std::string typeName = typeid(edm::DeviceProduct<PortableCollectionType>).name();
+      std::string typeName = alpaka_ngt::detail::serialiserLookupKey<PortableCollectionType>().name();
       std::unique_ptr<alpaka_ngt::SerialiserBase> serialiserSource{
           alpaka_ngt::SerialiserFactoryDevice::get()->create(typeName)};
 
@@ -211,7 +210,7 @@ TEST_CASE("Test MemoryCopyTraits", "[MemoryCopyTraits]") {
       edm::WrapperBase const* wb = static_cast<const edm::WrapperBase*>(&wrapper);
 
       // Get the serialiser plugin
-      std::string typeName = typeid(edm::DeviceProduct<DeviceObjectType>).name();
+      std::string typeName = alpaka_ngt::detail::serialiserLookupKey<DeviceObjectType>().name();
       std::unique_ptr<alpaka_ngt::SerialiserBase> serialiser{
           alpaka_ngt::SerialiserFactoryDevice::get()->create(typeName)};
       REQUIRE(serialiser);
@@ -291,7 +290,7 @@ TEST_CASE("Test MemoryCopyTraits", "[MemoryCopyTraits]") {
       edm::WrapperBase const* wb = static_cast<const edm::WrapperBase*>(&wrapper);
 
       // Get the serialiser plugin
-      std::string typeName = typeid(edm::DeviceProduct<DeviceCollection2Type>).name();
+      std::string typeName = alpaka_ngt::detail::serialiserLookupKey<DeviceCollection2Type>().name();
       std::unique_ptr<alpaka_ngt::SerialiserBase> serialiser{
           alpaka_ngt::SerialiserFactoryDevice::get()->create(typeName)};
       REQUIRE(serialiser);
