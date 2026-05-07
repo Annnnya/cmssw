@@ -65,11 +65,17 @@ def create_remote_process(local_process, modules_to_run, remote_process_name, lo
 def is_device_product(prod):
     return prod["type"].startswith("edm::DeviceProduct")
 
-def make_sender_patterns(module_name, products):
+def is_host_collection(prod):
+    return "Host" in prod["type"]
+    
+
+def make_sender_patterns(module_name, products, portable):
     patterns = []
 
     for p in products:
-        if is_device_product(p):
+        if not portable and is_device_product(p):
+            continue
+        if portable and is_host_collection(p):
             continue
 
         friendly_type_name = p["friendly_type_name"]
@@ -80,11 +86,15 @@ def make_sender_patterns(module_name, products):
     return patterns
 
 
-def make_receiver_psets(products):
+def make_receiver_psets(products, portable):
     psets = []
 
     for p in products:
-        if is_device_product(p):
+        # print(p, is_device_product(p), is_host_collection(p))
+        
+        if not portable and is_device_product(p):
+            continue
+        if portable and is_host_collection(p):
             continue
 
         psets.append(
@@ -97,11 +107,44 @@ def make_receiver_psets(products):
     return cms.VPSet(*psets)
 
 
-def make_grouped_receiver_psets(products):
+
+def make_sender_receiver_psets(products, portable):
     psets = []
 
     for p in products:
-        if is_device_product(p):
+        # print(p, is_device_product(p), is_host_collection(p))
+        
+        if not portable and is_device_product(p):
+            continue
+        if portable and is_host_collection(p):
+            continue
+        
+        if p["product_instance"] == "":
+            psets.append(
+                cms.PSet(
+                    type=cms.string(p["type"]),
+                    src=cms.InputTag(p['module'])
+                )
+            )
+        else:
+            psets.append(
+                cms.PSet(
+                    type=cms.string(p["type"]),
+                    src=cms.InputTag(p['module'], p['product_instance'])
+                )
+            )
+
+    return cms.VPSet(*psets)
+
+
+def make_grouped_receiver_psets(products, portable):
+    psets = []
+
+    for p in products:
+        # print(p, is_device_product(p), is_host_collection(p))
+        if not portable and is_device_product(p):
+            continue
+        if portable and is_host_collection(p):
             continue
         
         if p["product_instance"] == "":
@@ -131,26 +174,36 @@ def create_sender(
     instance,
     sender_upstream,
     path_state_capture=None,
+    portable=False
 ):
     """
     Add MPISender for one module.
     """
-    sender_products = make_sender_patterns(module_name, products)
+    sender_products = make_sender_patterns(module_name, products, portable)
+    
+    if not portable:
+        sender_type_name = "MPISender"
+        sender_products = make_sender_patterns(module_name, products, portable)
+        products = cms.vstring(*sender_products)
+    else:
+        sender_type_name = "MPISenderPortable@alpaka"
+        sender_products = make_sender_receiver_psets(products, portable)
+        products = cms.VPSet(*sender_products)
 
     if path_state_capture is not None:
         sender = cms.EDProducer(
-            "MPISender",
+            sender_type_name,
             upstream=cms.InputTag(sender_upstream),
             instance=cms.int32(instance),
-            products=cms.vstring(*sender_products),
+            products=products,
             activity=cms.InputTag(path_state_capture),
         )
     else:
         sender = cms.EDProducer(
-            "MPISender",
+            sender_type_name,
             upstream=cms.InputTag(sender_upstream),
             instance=cms.int32(instance),
-            products=cms.vstring(*sender_products),
+            products=products,
         )
 
     return sender
@@ -162,28 +215,38 @@ def create_group_sender(
     instance,
     upstream_module,
     path_state_capture=None,
+    portable=False
 ):
     """
     Add MPISender for multiple modules.
     """
-    sender_products = []
-    for offloaded_module in group:
-        sender_products.extend(make_sender_patterns(offloaded_module, all_products[offloaded_module]))
-
+    if not portable:
+        sender_type_name = "MPISender"
+        sender_products = []
+        for offloaded_module in group:
+            sender_products.extend(make_sender_patterns(offloaded_module, all_products[offloaded_module], portable))
+        products = cms.vstring(*sender_products)
+    else:
+        sender_type_name = "MPISenderPortable@alpaka"
+        sender_products = []
+        for offloaded_module in group:
+            sender_products.extend(make_sender_receiver_psets(all_products[offloaded_module], portable))
+        products = cms.VPSet(*sender_products)
+    
     if path_state_capture is not None:
         sender = cms.EDProducer(
-            "MPISender",
+            sender_type_name,
             upstream=cms.InputTag(upstream_module),
             instance=cms.int32(instance),
-            products=cms.vstring(*sender_products),
+            products=products,
             activity=cms.InputTag(path_state_capture),
         )
     else:
         sender = cms.EDProducer(
-            "MPISender",
+            sender_type_name,
             upstream=cms.InputTag(upstream_module),
             instance=cms.int32(instance),
-            products=cms.vstring(*sender_products),
+            products=products,
         )
 
     return sender
@@ -195,21 +258,40 @@ def create_group_receiver(
     instance,
     receiver_upstream,
     path_state_capture=False,
+    portable=False
 ):
     """
     MPIReceiver for one module.
     """
     receiver_products = []
-    for offloaded_module in group:
-        receiver_products.extend(make_grouped_receiver_psets(all_products[offloaded_module]))
-
-    receiver = cms.EDProducer(
-        "MPIReceiver",
-        upstream=cms.InputTag(receiver_upstream),
-        instance=cms.int32(instance),
-        products=cms.VPSet(*receiver_products),
-        activity=cms.bool(path_state_capture),
-    )
+    # for offloaded_module in group:
+    #     receiver_products.extend(make_grouped_receiver_psets(all_products[offloaded_module], portable))
+    
+    if not portable:
+        receiver_type_name = "MPIReceiver"
+        for offloaded_module in group:
+            receiver_products.extend(make_grouped_receiver_psets(all_products[offloaded_module], portable))
+    else:
+        receiver_type_name = "MPIReceiverPortable@alpaka"
+        for offloaded_module in group:
+            receiver_products.extend(make_sender_receiver_psets(all_products[offloaded_module], portable))
+        
+    if not portable:
+        receiver = cms.EDProducer(
+            receiver_type_name,
+            upstream=cms.InputTag(receiver_upstream),
+            instance=cms.int32(instance),
+            products=cms.VPSet(*receiver_products),
+            activity=cms.bool(path_state_capture),
+        )
+    else:
+        receiver = cms.EDProducer(
+            receiver_type_name,
+            upstream=cms.InputTag(receiver_upstream),
+            instance=cms.int32(instance),
+            products=cms.VPSet(*receiver_products),
+            activity=cms.bool(path_state_capture),
+        )
 
     return receiver
 
@@ -219,14 +301,21 @@ def create_receiver(
     instance,
     receiver_upstream,
     path_state_capture=False,
+    portable=False
 ):
     """
     MPIReceiver for one module.
     """
-    receiver_products = make_receiver_psets(products)
+    
+    if not portable:
+        receiver_type_name = "MPIReceiver"
+        receiver_products = make_receiver_psets(products, portable)
+    else:
+        receiver_type_name = "MPIReceiverPortable@alpaka"
+        receiver_products = make_sender_receiver_psets(products, portable)
 
     receiver = cms.EDProducer(
-        "MPIReceiver",
+        receiver_type_name,
         upstream=cms.InputTag(receiver_upstream),
         instance=cms.int32(instance),
         products=cms.VPSet(*receiver_products),
@@ -238,7 +327,8 @@ def create_receiver(
 
 def create_receiver_alias(receiver_name,
     products,
-    module_name
+    module_name,
+    portable = False
 ):
     """
     Create module aliases for receiver group
@@ -246,7 +336,9 @@ def create_receiver_alias(receiver_name,
     psets = []
 
     for p in products:
-        if is_device_product(p):
+        if not portable and is_device_product(p):
+            continue
+        if portable and is_host_collection(p):
             continue
         
         if p["product_instance"] == "":

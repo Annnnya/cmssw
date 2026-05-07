@@ -74,7 +74,8 @@ def split_remote(local_process, args, cpp_names_of_the_products):
                 products=cpp_names_of_the_products[local_dependency],
                 instance=instance,
                 sender_upstream=controller_name,
-                path_state_capture = capture_name
+                path_state_capture = capture_name,
+                portable=args.portable
             )
         sender_name = f"mpiSender{args.remote_process_name.title()}{local_dependency.title()}"
         setattr(local_process, sender_name, sender)
@@ -84,6 +85,7 @@ def split_remote(local_process, args, cpp_names_of_the_products):
                 instance=instance,
                 receiver_upstream="source",
                 path_state_capture=True,
+                portable=args.portable
             )
         # create filter for the path state
         filter_name = f"activityFilterAfter{local_dependency.title()}"
@@ -109,7 +111,8 @@ def split_remote(local_process, args, cpp_names_of_the_products):
                         products=[],
                         instance=instance,
                         sender_upstream=controller_name,
-                        path_state_capture = capture_name
+                        path_state_capture = capture_name,
+                        portable=args.portable
                     )
                 sender_name = f"mpiSender{args.remote_process_name.title()}Group{group_idx}Activity"
                 setattr(local_process, sender_name, sender)
@@ -119,6 +122,7 @@ def split_remote(local_process, args, cpp_names_of_the_products):
                         instance=instance,
                         receiver_upstream="source",
                         path_state_capture=True,
+                        portable=args.portable
                     )
                 receiver_name = f"mpiReceiver{args.remote_process_name.title()}Group{group_idx}Activity"
                 setattr(remote_process, receiver_name, receiver)
@@ -155,6 +159,7 @@ def split_remote(local_process, args, cpp_names_of_the_products):
             instance=instance,
             upstream_module=sender_upstream,
             path_state_capture=remote_capture_name,
+            portable=args.portable
         )
         sender_name = f"mpiSender{args.remote_process_name.title()}Group{group_idx}"
         setattr(remote_process, sender_name, sender)
@@ -170,6 +175,7 @@ def split_remote(local_process, args, cpp_names_of_the_products):
             instance=instance,
             receiver_upstream=receiver_upstream,
             path_state_capture=True,
+            portable=args.portable
         )
         receiver_name = f"mpiReceiver{args.remote_process_name.title()}Group{group_idx}"
         setattr(local_process, receiver_name, receiver)
@@ -189,7 +195,8 @@ def split_remote(local_process, args, cpp_names_of_the_products):
             delattr(local_process, offloaded_module)
             module_alias = create_receiver_alias(receiver_name=receiver_name,
                 products=cpp_names_of_the_products[offloaded_module],
-                module_name=offloaded_module
+                module_name=offloaded_module,
+                portable=args.portable
             )
             setattr(local_process, offloaded_module, module_alias)
 

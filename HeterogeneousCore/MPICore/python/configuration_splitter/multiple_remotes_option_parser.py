@@ -14,6 +14,7 @@ def build_global_parser():
     )
     parser.add_argument("-c", "--reuse-cpp-names", action="store_true")
     parser.add_argument("-v", "--verbose", action="store_true")
+    parser.add_argument("-p", "--portable", action="store_true")
     parser.add_argument(
         "-l",
         "--output-local",
@@ -173,6 +174,7 @@ def parse_mpi_style_args(argv):
         cfg.config = global_args.config
         cfg.output_local = global_args.output_local
         cfg.reuse_cpp_names = global_args.reuse_cpp_names
+        cfg.portable = global_args.portable
         cfg.verbose = global_args.verbose
 
         cfg.remote_modules = proc_args.remote_modules or []
@@ -192,6 +194,7 @@ def parse_mpi_style_args(argv):
         cfg.config = global_args.config
         cfg.output_local = global_args.output_local
         cfg.reuse_cpp_names = global_args.reuse_cpp_names
+        cfg.portable = global_args.portable
         cfg.verbose = global_args.verbose
 
         # per-process overrides
