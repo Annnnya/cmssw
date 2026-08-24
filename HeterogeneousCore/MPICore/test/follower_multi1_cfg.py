@@ -44,7 +44,10 @@ process.otherreceiver = MPIReceiver(
 process.sender = MPISender(
     upstream = "otherreceiver", # guarantees that this module will only run after otherreceiver has run
     instance = 13,
-    products = [ "edmEventID_otherreceiver__*" ]
+    products = cms.VPSet(cms.PSet(
+        type = cms.string("edm::EventID"),
+        inputTag = cms.InputTag('otherreceiver')
+    ))
 )
 
 process.analyzer = cms.EDAnalyzer("edmtest::EventIDValidator",
