@@ -1,4 +1,5 @@
 <use name="mpi"/>
+<use name="rootcling"/>
 <use name="FWCore/ParameterSet"/>
 <use name="FWCore/ServiceRegistry"/>
 <export>

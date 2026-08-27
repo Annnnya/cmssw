@@ -7,6 +7,7 @@ process.options.numberOfStreams = 4
 process.options.wantSummary = False
 
 process.load("HeterogeneousCore.MPIServices.MPIService_cfi")
+process.load("HeterogeneousCore.MPIServices.MPIConsistencyChecker_cfi")
 
 from HeterogeneousCore.MPICore.modules import *
 

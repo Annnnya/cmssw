@@ -16,6 +16,7 @@ process.source = cms.Source("EmptySource")
 process.maxEvents.input = 10
 
 process.load("HeterogeneousCore.MPIServices.MPIService_cfi")
+process.load("HeterogeneousCore.MPIServices.MPIConsistencyChecker_cfi")
 
 # produce and send a portable object, a portable collection, and some portable multicollections
 process.load("Configuration.StandardSequences.Accelerators_cff")
@@ -41,13 +42,26 @@ process.producePortableObjects = cms.EDProducer("TestAlpakaProducer@alpaka",
 process.sender = MPISender(
     upstream = "mpiController",
     instance = 42,
-    products = [
-        "portabletestTestStructPortableHostObject_producePortableObjects__*",
-        "128falseportabletestTestSoALayoutPortableHostCollection_producePortableObjects__*",
-        "128falseportabletestSoABlocks2PortableHostCollection_producePortableObjects__*",
-        "128falseportabletestSoABlocks3PortableHostCollection_producePortableObjects__*",
-        "ushort_producePortableObjects_backend_*"
-    ]
+    products = [ dict(
+        type = "PortableHostObject<portabletest::TestStruct>",
+        name = 'producePortableObjects'
+    ),
+    dict(
+        type = "PortableHostCollection<portabletest::TestSoALayout<128,false> >",
+        name = 'producePortableObjects'
+    ),
+    dict(
+        type = "PortableHostCollection<portabletest::SoABlocks2<128,false> >",
+        name = 'producePortableObjects'
+    ),
+    dict(
+        type = "PortableHostCollection<portabletest::SoABlocks3<128,false> >",
+        name = 'producePortableObjects'
+    ),
+    dict(
+        type = "ushort",
+        name = 'producePortableObjects@backend'
+    )]
 )
 
 # Same thing, but this time disabling TrivialSerialisation so all products are
@@ -56,13 +70,26 @@ process.senderNoTrivialSerialisation = MPISender(
     upstream = "sender",
     instance = 43,
     enableTrivialSerialisation = False,
-    products = [
-        "portabletestTestStructPortableHostObject_producePortableObjects__*",
-        "128falseportabletestTestSoALayoutPortableHostCollection_producePortableObjects__*",
-        "128falseportabletestSoABlocks2PortableHostCollection_producePortableObjects__*",
-        "128falseportabletestSoABlocks3PortableHostCollection_producePortableObjects__*",
-        "ushort_producePortableObjects_backend_*"
-    ]
+    products = [ dict(
+        type = "PortableHostObject<portabletest::TestStruct>",
+        name = 'producePortableObjects'
+    ),
+    dict(
+        type = "PortableHostCollection<portabletest::TestSoALayout<128,false> >",
+        name = 'producePortableObjects'
+    ),
+    dict(
+        type = "PortableHostCollection<portabletest::SoABlocks2<128,false> >",
+        name = 'producePortableObjects'
+    ),
+    dict(
+        type = "PortableHostCollection<portabletest::SoABlocks3<128,false> >",
+        name = 'producePortableObjects'
+    ),
+    dict(
+        type = "ushort",
+        name = 'producePortableObjects@backend'
+    )]
 )
 
 process.pathSoA = cms.Path(

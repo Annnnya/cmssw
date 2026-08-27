@@ -26,6 +26,7 @@
 #include "FWCore/Utilities/interface/Exception.h"
 #include "HeterogeneousCore/MPICore/interface/MPIChannel.h"
 #include "HeterogeneousCore/MPICore/interface/MPIToken.h"
+#include "HeterogeneousCore/MPIServices/interface/MPIConsistencyChecker.h"
 #include "HeterogeneousCore/TrivialSerialisation/interface/AnyBuffer.h"
 #include "HeterogeneousCore/TrivialSerialisation/interface/SerialiserBase.h"
 #include "HeterogeneousCore/TrivialSerialisation/interface/SerialiserFactory.h"
@@ -66,6 +67,15 @@ public:
     }
 
     received_wrappers_.resize(products_.size());
+
+    edm::Service<MPIConsistencyChecker> mpiservice;
+    std::vector<std::string> product_types;
+    for (auto const& entry : products_) {
+      product_types.push_back(entry.type.name());
+    }
+    std::string module_label = config.getParameter<std::string>("@module_label");
+    std::string upstream_label = config.getParameter<edm::InputTag>("upstream").label();
+    mpiservice->recordMPIModuleInfo_(false, module_label, upstream_label, this->instance_, product_types);
   }
 
   void acquire(edm::Event const& event, edm::EventSetup const&, edm::WaitingTaskWithArenaHolder holder) final {

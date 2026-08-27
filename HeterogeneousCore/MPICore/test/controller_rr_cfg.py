@@ -10,6 +10,7 @@ process.options.numberOfConcurrentRuns = 1
 process.options.wantSummary = False
 
 process.load("HeterogeneousCore.MPIServices.MPIService_cfi")
+process.load("HeterogeneousCore.MPIServices.MPIConsistencyChecker_cfi")
 
 from eventlist_cff import eventlist
 process.source = cms.Source("EmptySourceFromEventIDs",
@@ -34,13 +35,19 @@ process.initialcheck = cms.EDAnalyzer("edmtest::EventIDValidator",
 process.sender = MPISender(
     upstream = "mpiController",
     instance = 42,
-    products = [ "edmEventID_ids__*" ]
+    products = [ dict(
+        type = "edm::EventID",
+        name = 'ids'
+    )]
 )
 
 process.othersender = MPISender(
     upstream = "mpiController",
     instance = 19,
-    products = [ "edmEventID_ids__*" ]
+    products = [ dict(
+        type = "edm::EventID",
+        name = 'ids'
+    )]
 )
 
 process.receiver = MPIReceiver(

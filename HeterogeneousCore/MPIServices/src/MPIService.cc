@@ -1,5 +1,6 @@
 // -*- C++ -*-
 #include <cstdlib>
+#include <deque>
 #include <exception>
 #include <mutex>
 #include <string>

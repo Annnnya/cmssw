@@ -9,6 +9,7 @@ process.options.numberOfConcurrentRuns = 2
 process.options.wantSummary = False
 
 process.load("HeterogeneousCore.MPIServices.MPIService_cfi")
+process.load("HeterogeneousCore.MPIServices.MPIConsistencyChecker_cfi")
 
 from HeterogeneousCore.MPICore.modules import MPISource, MPIReceiver, MPISender
 

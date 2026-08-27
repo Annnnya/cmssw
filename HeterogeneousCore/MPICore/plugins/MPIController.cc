@@ -33,6 +33,7 @@
 #include "HeterogeneousCore/MPICore/interface/MPIToken.h"
 #include "HeterogeneousCore/MPICore/interface/messages.h"
 #include "HeterogeneousCore/MPIServices/interface/MPIService.h"
+#include "HeterogeneousCore/MPIServices/interface/MPIConsistencyChecker.h"
 
 /* MPIController class
  *
@@ -76,11 +77,13 @@ private:
   std::vector<std::optional<MPIChannel>> streams_;
   edm::EDPutTokenT<MPIToken> token_;
   Mode mode_;
+  std::string module_label_;
 };
 
 MPIController::MPIController(edm::ParameterSet const& config)
     : token_(produces<MPIToken>()),
-      mode_(parseMode(config.getUntrackedParameter<std::string>("mode")))  //
+      mode_(parseMode(config.getUntrackedParameter<std::string>("mode"))),
+      module_label_(config.getParameter<std::string>("@module_label"))  //
 {
   // Make sure that MPI is initialised.
   MPIService::required();
@@ -147,6 +150,10 @@ MPIController::MPIController(edm::ParameterSet const& config)
       follower = 1;
       channels_.emplace_back(comm, follower);
     }
+
+    edm::Service<MPIConsistencyChecker> module_info_service;
+    module_info_service->registerMPIPathOrigin(module_label_);
+
   } else if (mode_ == kIntercommunicator) {
     // Use an intercommunicator to let two groups of processes communicate with each other.
     // The current implementation supports only two processes: one controller and one source.
@@ -210,6 +217,15 @@ void MPIController::beginJob() {
     edm::LogAbsolute("MPI") << keyval.first << ": " << keyval.second;
   }
   */
+
+  edm::Service<MPIConsistencyChecker> module_info_service;
+  module_info_service->reconstructMPIPaths();
+  std::vector<char> buffer;
+  module_info_service->getSerializedMPIModuleInfo(buffer, module_label_);
+  for (auto& channel : channels_) {
+    // transmit the information about the MPI senders and receivers in the current path
+    channel.sendModulesInfo(buffer);
+  }
 }
 
 void MPIController::endJob() {
@@ -239,7 +255,6 @@ void MPIController::beginRun(edm::Run const& run, edm::EventSetup const& setup) 
   aux.setProcessHistoryID(run.processHistory().id());
   for (auto& channel : channels_) {
     channel.sendBeginRun(aux);
-
     // transmit the ProcessHistory
     channel.sendProduct(0, run.processHistory());
   }
